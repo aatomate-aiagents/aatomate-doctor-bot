@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getTenants, updateTenant, deleteTenant } from "@/lib/api";
 import { Loader2, Search, Filter, MoreVertical, Building2, MapPin, Edit, Power, Trash2, Plus } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { 
@@ -16,6 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export default function HospitalsPage() {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const { data: tenants, isLoading } = useQuery({
     queryKey: ["tenants"],
@@ -190,7 +192,10 @@ export default function HospitalsPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-40 bg-white">
                           <DropdownMenuLabel className="text-[10px] text-[#6B7280]">Actions</DropdownMenuLabel>
-                          <DropdownMenuItem className="text-[13px] text-[#111827] cursor-pointer">
+                          <DropdownMenuItem 
+                            className="text-[13px] text-[#111827] cursor-pointer"
+                            onClick={() => router.push(`/super-admin/hospitals/${tenant.id}/edit`)}
+                          >
                             <Edit className="w-3.5 h-3.5 mr-2" />
                             Edit Details
                           </DropdownMenuItem>

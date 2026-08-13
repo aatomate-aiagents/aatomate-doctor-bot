@@ -44,6 +44,10 @@ export const getTenants = async (): Promise<Tenant[]> => {
   return (await api.get("/tenants/")).data;
 };
 
+export const getTenant = async (id: string): Promise<Tenant> => {
+  return (await api.get(`/tenants/${id}`)).data;
+};
+
 export const getMyTenant = async (): Promise<Tenant> => {
   return (await api.get("/tenants/me")).data;
 };
