@@ -2,7 +2,6 @@
 
 import { Role } from "@/lib/rbac";
 import { UserProfile } from "@/lib/rbac";
-import { AddUserModal } from "@/components/modals/AddUserModal";
 import { UserPlus, CalendarPlus, FileText, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -19,27 +18,21 @@ export function QuickActions({ userProfile }: QuickActionsProps) {
       </div>
       
       <div className="flex-1 p-3 space-y-2">
-        <AddUserModal 
-          fixedRole={Role.DOCTOR} 
-          fixedTenantId={userProfile.tenantId} 
-          customTrigger={
-            <button className="w-full flex items-center text-sm text-[#4B5563] hover:bg-[#F3F4F6] hover:text-[#111827] h-10 px-3 rounded-md transition-colors">
-              <UserPlus className="w-4 h-4 mr-2 text-[#9CA3AF]" />
-              Add New Doctor
-            </button>
-          }
-        />
+        <Link 
+          href="/admin/users/new?role=doctor"
+          className="w-full flex items-center text-sm text-[#4B5563] hover:bg-[#F3F4F6] hover:text-[#111827] h-10 px-3 rounded-md transition-colors"
+        >
+          <UserPlus className="w-4 h-4 mr-2 text-[#9CA3AF]" />
+          Add New Doctor
+        </Link>
         
-        <AddUserModal 
-          fixedRole={Role.STAFF} 
-          fixedTenantId={userProfile.tenantId} 
-          customTrigger={
-            <button className="w-full flex items-center text-sm text-[#4B5563] hover:bg-[#F3F4F6] hover:text-[#111827] h-10 px-3 rounded-md transition-colors">
-              <UserPlus className="w-4 h-4 mr-2 text-[#9CA3AF]" />
-              Add New Staff
-            </button>
-          }
-        />
+        <Link 
+          href="/admin/users/new?role=staff"
+          className="w-full flex items-center text-sm text-[#4B5563] hover:bg-[#F3F4F6] hover:text-[#111827] h-10 px-3 rounded-md transition-colors"
+        >
+          <UserPlus className="w-4 h-4 mr-2 text-[#9CA3AF]" />
+          Add New Staff
+        </Link>
 
         {/* Existing routes logic */}
         <Link href="/admin/patients" className="w-full flex items-center text-sm text-[#4B5563] hover:bg-[#F3F4F6] hover:text-[#111827] h-10 px-3 rounded-md transition-colors">
