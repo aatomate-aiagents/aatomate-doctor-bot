@@ -18,6 +18,7 @@ class UserCreate(BaseModel):
     roles: Optional[List[str]] = None  # New multi-role field
     tenant_id: Optional[str] = None
     phone: Optional[str] = None
+    password: Optional[str] = None
 
 class UserResponse(BaseModel):
     uid: str
@@ -57,7 +58,10 @@ def create_user(user_in: UserCreate, current_user: CurrentUser = Depends(get_cur
         if not db:
             raise HTTPException(status_code=500, detail="Database not initialized")
             
-        random_password = generate_random_password()
+        if user_in.password:
+            password_to_use = user_in.password
+        else:
+            password_to_use = generate_random_password()
         
         # Determine roles array
         if user_in.roles and len(user_in.roles) > 0:
@@ -74,7 +78,7 @@ def create_user(user_in: UserCreate, current_user: CurrentUser = Depends(get_cur
         # 1. Create the user in Supabase Auth using Admin API
         user_response = with_retry(lambda: db.auth.admin.create_user({
             "email": user_in.email,
-            "password": random_password,
+            "password": password_to_use,
             "phone": user_in.phone,
             "email_confirm": True,
             "user_metadata": {

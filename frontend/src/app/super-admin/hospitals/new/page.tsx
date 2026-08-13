@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { createTenant } from "@/lib/api";
+import { createTenant, createUser } from "@/lib/api";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, ArrowLeft, Building2, User, MapPin } from "lucide-react";
 import { toast } from "sonner";
@@ -25,6 +25,7 @@ export default function NewHospitalPage() {
   // Contact
   const [email, setEmail] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [password, setPassword] = useState("");
   
   // Location
   const [address, setAddress] = useState("");
@@ -37,14 +38,14 @@ export default function NewHospitalPage() {
     e.preventDefault();
     
     // Basic validation
-    if (!hospitalName || !name || !email || !phoneNumber) {
+    if (!hospitalName || !name || !email || !phoneNumber || !password) {
       toast.error("Please fill in all required fields.");
       return;
     }
 
     setLoading(true);
     try {
-      await createTenant({
+      const tenant = await createTenant({
         hospital_name: hospitalName,
         name,
         email,
@@ -55,6 +56,18 @@ export default function NewHospitalPage() {
         latitude: latitude ? parseFloat(latitude) : undefined,
         longitude: longitude ? parseFloat(longitude) : undefined,
       });
+      
+      // Create the initial admin user with the provided password
+      if (tenant?.id) {
+        await createUser({
+          email,
+          name,
+          role: "hospital_admin",
+          tenant_id: tenant.id,
+          phone: phoneNumber,
+          password
+        });
+      }
       
       toast.success("Hospital created successfully!");
       queryClient.invalidateQueries({ queryKey: ["tenants"] });
@@ -150,6 +163,20 @@ export default function NewHospitalPage() {
                   placeholder="+1234567890" 
                   required 
                 />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="password">Initial Admin Password <span className="text-red-500">*</span></Label>
+                <Input 
+                  id="password" 
+                  type="password"
+                  value={password} 
+                  onChange={(e) => setPassword(e.target.value)} 
+                  placeholder="Demo or strong password for this admin" 
+                  required 
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  The hospital admin will use this password to log in for the first time.
+                </p>
               </div>
             </CardContent>
           </Card>

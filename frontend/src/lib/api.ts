@@ -86,7 +86,7 @@ export const getUsers = async (): Promise<any[]> => {
   return (await api.get("/users/")).data;
 };
 
-export const createUser = async (data: { email: string; name: string; role?: string; roles?: string[]; tenant_id?: string; phone?: string }): Promise<any> => {
+export const createUser = async (data: { email: string; name: string; role?: string; roles?: string[]; tenant_id?: string; phone?: string; password?: string }): Promise<any> => {
   return (await api.post("/users/", data)).data;
 };
 
