@@ -190,7 +190,68 @@ def handle_flow_data_exchange(decrypted_body: Dict[str, Any], tenant_id: str) ->
 
     doctors = _get_doctors(tenant_id)
 
-    # ── INITIAL SCREEN: open → DOCTOR_SELECTION ───────────────────────────────
+    flow_type = state.get("f", "appointment")
+
+    # ── REGISTRATION FLOW ─────────────────────────────────────────────────────
+    if flow_type == "register":
+        if action in ("INIT", "init") or (not trigger and screen in ("", "PATIENT_REGISTRATION", None)):
+            return {
+                "version": version,
+                "screen": "PATIENT_REGISTRATION",
+                "data": {
+                    "patient_name_prefill": patient_name,
+                    "patient_phone_prefill": patient_phone,
+                }
+            }
+            
+        if trigger == "registration_review":
+            name = payload.get("name", patient_name)
+            phone = payload.get("phone", patient_phone)
+            email = payload.get("email", "")
+            gender = payload.get("gender", "")
+            dob = payload.get("dob", "")
+            
+            summary = (
+                f"📋 *Registration Summary*\n\n"
+                f"👤 Name: {name}\n"
+                f"📱 Phone: {phone}\n"
+                f"📧 Email: {email or 'N/A'}\n"
+                f"⚧ Gender: {gender.capitalize()}\n"
+                f"🎂 DOB: {dob or 'N/A'}"
+            )
+            return {
+                "version": version,
+                "screen": "REGISTRATION_SUMMARY",
+                "data": {
+                    "summary_text": summary,
+                    "name": name,
+                    "phone": phone,
+                    "email": email,
+                    "gender": gender,
+                    "dob": dob
+                }
+            }
+            
+        if trigger == "final_registration" or screen == "REGISTRATION_SUMMARY":
+            return {
+                "version": version,
+                "screen": "SUCCESS",
+                "data": {
+                    "extension_message_response": {
+                        "params": {
+                            "flow_token": flow_token,
+                            "status": "registration_confirmed",
+                            "name": payload.get("name", ""),
+                            "phone": payload.get("phone", ""),
+                            "email": payload.get("email", ""),
+                            "gender": payload.get("gender", ""),
+                            "dob": payload.get("dob", "")
+                        }
+                    }
+                }
+            }
+
+    # ── APPOINTMENT FLOW: INITIAL SCREEN: open → DOCTOR_SELECTION ─────────────
     if action in ("INIT", "init") or (not trigger and screen in ("", "DOCTOR_SELECTION", None)):
         specialties = _get_specialties(doctors)
         return {

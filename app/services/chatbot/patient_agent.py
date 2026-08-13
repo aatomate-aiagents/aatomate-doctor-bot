@@ -1176,9 +1176,37 @@ class PatientAgent:
                                             appt_id = ""
 
                                         self.send_success_messages(from_number, phone_number_id, doctor, tenant_id, appt_id, patient_id=patient_id_db, appt_date=date_val or "", appt_time=time_val or "")
-                                    elif status == "registration_success":
-                                        self.send_whatsapp_message(from_number, "✅ Registration Successful!", phone_number_id)
-                                        self.send_flow_cta_message(from_number, phone_number_id, profile_name)
+                                    elif status == "registration_success" or status == "registration_confirmed":
+                                        try:
+                                            from app.db.supabase import db
+                                            import uuid
+                                            
+                                            patient_id_db = str(uuid.uuid5(uuid.NAMESPACE_OID, "wa_" + "".join(filter(str.isdigit, from_number))))
+                                            name = resp_data.get("name") or profile_name
+                                            phone = resp_data.get("phone") or from_number
+                                            gender = resp_data.get("gender", "")
+                                            dob = resp_data.get("dob", None)
+                                            if dob == "": dob = None
+                                            
+                                            # Check if patient exists first
+                                            existing = db.table("patients").select("id").eq("mobile_number", phone).eq("tenant_id", tenant_id).execute()
+                                            if not existing.data:
+                                                db.table("patients").insert({
+                                                    "id": patient_id_db,
+                                                    "tenant_id": tenant_id,
+                                                    "name": name,
+                                                    "mobile_number": phone,
+                                                    "gender": gender,
+                                                    "date_of_birth": dob,
+                                                    "is_whatsapp_opt_in": True
+                                                }).execute()
+                                                
+                                            self.send_whatsapp_message(from_number, f"✅ Registration Successful! Welcome {name} 🎉\n\nLet's get you booked for an appointment.", phone_number_id)
+                                            self.send_flow_cta_message(from_number, phone_number_id, name)
+                                        except Exception as e:
+                                            logger.error(f"[nfm_reply] DB insert error for patient registration: {e}")
+                                            self.send_whatsapp_message(from_number, "⚠️ Registration had a minor issue, but you can still book an appointment.", phone_number_id)
+                                            self.send_flow_cta_message(from_number, phone_number_id, profile_name)
                                 except Exception as e:
                                     logger.error(f"[nfm_reply] parse error: {e}")
 
