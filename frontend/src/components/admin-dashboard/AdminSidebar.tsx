@@ -13,7 +13,6 @@ import {
   FileText,
   CreditCard,
   Settings,
-  Sparkles,
   LogOut,
   BriefcaseMedical
 } from "lucide-react";
@@ -33,7 +32,6 @@ const navigation = [
   { name: "Departments", href: "/admin/departments", icon: Building2 },
   { name: "Billing & Payments", href: "/admin/billing", icon: CreditCard },
   { name: "Medical Reports", href: "/admin/reports", icon: FileText },
-  { name: "AI Insights", href: "/admin/insights", icon: Sparkles },
   { name: "Settings", href: "/admin/settings", icon: Settings },
 ];
 
