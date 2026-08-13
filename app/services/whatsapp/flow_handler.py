@@ -100,9 +100,15 @@ def _get_available_slots(doctor_id: str, tenant_id: str, date_str: str) -> List[
         )()
 
         if not sched_res.data:
-            return []
-
-        sched = sched_res.data[0]
+            sched = {
+                "start_time": "09:00:00",
+                "end_time": "17:00:00",
+                "slot_duration_minutes": 30,
+                "break_start": None,
+                "break_end": None
+            }
+        else:
+            sched = sched_res.data[0]
 
         # Get already-booked slots
         booked_res = with_retry(
