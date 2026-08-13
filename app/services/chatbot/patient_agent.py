@@ -1179,9 +1179,9 @@ class PatientAgent:
                                     elif status == "registration_success" or status == "registration_confirmed":
                                         try:
                                             from app.db.supabase import db
-                                            import uuid
+                                            import uuid as local_uuid
                                             
-                                            patient_id_db = str(uuid.uuid5(uuid.NAMESPACE_OID, "wa_" + "".join(filter(str.isdigit, from_number))))
+                                            patient_id_db = str(local_uuid.uuid5(local_uuid.NAMESPACE_OID, "wa_" + "".join(filter(str.isdigit, from_number))))
                                             name = resp_data.get("name") or profile_name
                                             phone = resp_data.get("phone") or from_number
                                             gender = resp_data.get("gender", "")
@@ -1197,8 +1197,7 @@ class PatientAgent:
                                                     "name": name,
                                                     "mobile_number": phone,
                                                     "gender": gender,
-                                                    "date_of_birth": dob,
-                                                    "is_whatsapp_opt_in": True
+                                                    "dob": dob
                                                 }).execute()
                                                 
                                             self.send_whatsapp_message(from_number, f"✅ Registration Successful! Welcome {name} 🎉\n\nLet's get you booked for an appointment.", phone_number_id)
