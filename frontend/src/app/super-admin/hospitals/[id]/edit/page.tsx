@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,8 +13,10 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { Separator } from "@/components/ui/separator";
 
-export default function EditHospitalPage({ params }: { params: { id: string } }) {
+export default function EditHospitalPage() {
   const router = useRouter();
+  const params = useParams();
+  const id = params.id as string;
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   
@@ -34,9 +36,9 @@ export default function EditHospitalPage({ params }: { params: { id: string } })
   const [longitude, setLongitude] = useState("");
 
   const { data: tenant, isLoading: isFetching } = useQuery({
-    queryKey: ["tenant", params.id],
-    queryFn: () => getTenant(params.id),
-    enabled: !!params.id
+    queryKey: ["tenant", id],
+    queryFn: () => getTenant(id),
+    enabled: !!id
   });
 
   useEffect(() => {
@@ -64,7 +66,7 @@ export default function EditHospitalPage({ params }: { params: { id: string } })
 
     setLoading(true);
     try {
-      await updateTenant(params.id, {
+      await updateTenant(id, {
         hospital_name: hospitalName,
         name,
         email,
@@ -78,7 +80,7 @@ export default function EditHospitalPage({ params }: { params: { id: string } })
       
       toast.success("Hospital updated successfully!");
       queryClient.invalidateQueries({ queryKey: ["tenants"] });
-      queryClient.invalidateQueries({ queryKey: ["tenant", params.id] });
+      queryClient.invalidateQueries({ queryKey: ["tenant", id] });
       
       // Redirect back to hospitals list
       router.push("/super-admin/hospitals");
