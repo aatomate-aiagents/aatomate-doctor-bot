@@ -280,6 +280,24 @@ def _fmt_reports(reports: list) -> str:
 # Interactive message builders
 # ─────────────────────────────────────────────
 
+
+def _button_payload(text: str, buttons: list) -> dict:
+    return {
+        "type": "interactive",
+        "interactive": {
+            "type": "button",
+            "body": {"text": text},
+            "action": {
+                "buttons": [
+                    {"type": "reply", "reply": {"id": b["id"], "title": b["title"][:20]}} for b in buttons[:3]
+                ]
+            }
+        }
+    }
+
+def _back_to_menu_payload(text: str) -> dict:
+    return _button_payload(text, [{"id": "ACTION_BACK", "title": "⬅️ Main Menu"}])
+
 def _main_menu_payload(doctor_name: str) -> dict:
     """WhatsApp interactive list message — main menu."""
     return {
@@ -413,7 +431,7 @@ class DoctorAgent:
             
             patient_id = session.get("selected_patient_id")
             if not patient_id:
-                self.sender.send_message(from_number, "❌ No patient selected. Type *menu* to start, select a patient, then upload the report.")
+                self.sender.send_interactive_message(from_number, _back_to_menu_payload("❌ No patient selected. Please select a patient first to upload a report."))
                 return
                 
             if media_id:
@@ -434,14 +452,19 @@ class DoctorAgent:
 
         elif reply_id == "SEARCH_PATIENT":
             session["flow"] = "SEARCHING"
-            self.sender.send_message(from_number,
-                "🔍 *Search Patient*\n\nType the patient's *name* or *mobile number* to search:")
+            self.sender.send_interactive_message(from_number,
+                _back_to_menu_payload("🔍 *Search Patient*\n\nType the patient's *name* or *mobile number* to search:"))
 
         elif reply_id == "MARK_UNAVAILABLE":
             session["flow"] = "MARK_LEAVE"
-            self.sender.send_message(from_number,
-                "🗓️ *Mark Leave / Unavailable*\n\n"
-                "Please type the date you want to mark as unavailable (e.g., 'today', 'tomorrow', or 'YYYY-MM-DD'):")
+            self.sender.send_interactive_message(from_number, _button_payload(
+                "🗓️ *Mark Leave / Unavailable*\n\nWhen will you be unavailable?",
+                [
+                    {"id": "LEAVE_TODAY", "title": "Today"},
+                    {"id": "LEAVE_TOMORROW", "title": "Tomorrow"},
+                    {"id": "ACTION_BACK", "title": "⬅️ Back"}
+                ]
+            ))
 
         elif reply_id == "ACTION_LABS":
             self._show_labs(from_number, session, doctor)
@@ -469,6 +492,21 @@ class DoctorAgent:
             session = _get_session(from_number)
             session["doctor"] = doctor
             self.sender.send_interactive_message(from_number, _main_menu_payload(doctor.name))
+
+        elif reply_id in ("LEAVE_TODAY", "LEAVE_TOMORROW"):
+            from datetime import timedelta
+            target_date = date.today().isoformat() if reply_id == "LEAVE_TODAY" else (date.today() + timedelta(days=1)).isoformat()
+            try:
+                res = db.table("appointments").select("id").eq("doctor_id", doctor.id).eq("appointment_date", target_date).neq("status", "completed").neq("status", "cancelled").execute()
+                appts = res.data or []
+                for appt in appts:
+                    db.table("appointments").update({"status": "cancelled"}).eq("id", appt['id']).execute()
+                self.sender.send_interactive_message(from_number, _back_to_menu_payload(f"✅ Successfully marked *{target_date}* as Leave. Cancelled {len(appts)} scheduled appointment(s)."))
+            except Exception as e:
+                logger.error(f"[DoctorAgent] Error marking leave: {e}")
+                self.sender.send_interactive_message(from_number, _back_to_menu_payload("⚠️ Failed to mark leave. Please try again."))
+            session["flow"] = ""
+            return
 
         elif reply_id.startswith("PAT_"):
             parts = reply_id[4:].split("::")
@@ -519,7 +557,7 @@ class DoctorAgent:
                 for appt in appts:
                     db.table("appointments").update({"status": "cancelled"}).eq("id", appt['id']).execute()
 
-                self.sender.send_message(from_number, f"✅ Successfully marked *{target_date}* as Leave. Cancelled {len(appts)} scheduled appointment(s).\n\nType *menu* to go back.")
+                self.sender.send_interactive_message(from_number, _back_to_menu_payload(f"✅ Successfully marked *{target_date}* as Leave. Cancelled {len(appts)} scheduled appointment(s)."))
             except Exception as e:
                 logger.error(f"[DoctorAgent] Error marking leave: {e}")
                 self.sender.send_message(from_number, "⚠️ Failed to mark leave. Please try again.")
@@ -530,16 +568,31 @@ class DoctorAgent:
         if flow == "SEARCHING":
             results = _search_patients(self.tenant_id, text)
             if not results:
-                self.sender.send_message(from_number,
-                    f"❌ No patients found for *\"{text}\"*.\nTry a different name or number, or type *menu* to go back.")
+                self.sender.send_interactive_message(from_number,
+                    _back_to_menu_payload(f"❌ No patients found for *\"{text}\"*.\nTry a different name or number."))
                 return
             session["search_results"] = results
             session["flow"] = "SELECT_SEARCH_PATIENT"
-            lines = [f"Found *{len(results)}* patient(s). Reply with the number to select:\n"]
-            for i, p in enumerate(results, 1):
-                lines.append(f"{i}. {p['name']} — 📱 {p.get('mobile_number', 'N/A')}")
-            lines.append("\nOr type *menu* to go back.")
-            self.sender.send_message(from_number, "\n".join(lines))
+            rows = []
+            for p in results:
+                rows.append({
+                    "id": f"PAT_{p['id']}::",
+                    "title": p['name'][:24],
+                    "description": p.get('mobile_number', 'N/A')[:72]
+                })
+            payload = {
+                "type": "interactive",
+                "interactive": {
+                    "type": "list",
+                    "header": {"type": "text", "text": "🔍 Search Results"},
+                    "body": {"text": f"Found {len(results)} patient(s) for \"{text}\"."},
+                    "action": {
+                        "button": "View Patients",
+                        "sections": [{"title": "Results", "rows": rows[:10]}]
+                    }
+                }
+            }
+            self.sender.send_interactive_message(from_number, payload)
             return
 
         if flow == "SELECT_SEARCH_PATIENT":
@@ -550,8 +603,7 @@ class DoctorAgent:
                     patient_id = results[idx]["id"]
                     self._select_patient(from_number, session, doctor, patient_id)
                     return
-            self.sender.send_message(from_number,
-                "❓ Please reply with a valid number from the list, or type *menu* to go back.")
+            self.sender.send_interactive_message(from_number, _back_to_menu_payload("❓ Please select a valid patient from the list."))
             return
 
         # ── Today's patient selection by number ──
@@ -565,8 +617,7 @@ class DoctorAgent:
                     if patient_id:
                         self._select_patient(from_number, session, doctor, patient_id)
                         return
-            self.sender.send_message(from_number,
-                "❓ Please reply with a valid number from the list, or type *menu* to go back.")
+            self.sender.send_interactive_message(from_number, _back_to_menu_payload("❓ Please select a valid patient from the list."))
             return
 
         # ── Prescription writing flow ──
@@ -582,8 +633,8 @@ class DoctorAgent:
     def _show_today_patients(self, from_number: str, session: dict, doctor):
         appts = _get_today_appointments(self.tenant_id, doctor.id)
         if not appts:
-            self.sender.send_message(from_number,
-                f"📅 No appointments scheduled for today ({date.today().strftime('%d %b %Y')}).\n\nType *menu* to go back.")
+            self.sender.send_interactive_message(from_number,
+                _back_to_menu_payload(f"📅 No appointments scheduled for today ({date.today().strftime('%d %b %Y')})."))
             return
 
         session["today_appts"] = appts
@@ -647,7 +698,7 @@ class DoctorAgent:
     def _select_patient(self, from_number: str, session: dict, doctor, patient_id: str, appt_id: str = ""):
         patient = _get_patient(patient_id)
         if not patient:
-            self.sender.send_message(from_number, "❌ Could not fetch patient details. Type *menu* to go back.")
+            self.sender.send_interactive_message(from_number, _back_to_menu_payload("❌ Could not fetch patient details."))
             return
         session["selected_patient_id"] = patient_id
         session["selected_appt_id"] = appt_id
@@ -665,7 +716,7 @@ class DoctorAgent:
         patient_id = session.get("selected_patient_id")
         patient_name = session.get("selected_patient_name", "Patient")
         if not patient_id:
-            self.sender.send_message(from_number, "❌ No patient selected. Type *menu* to start over.")
+            self.sender.send_interactive_message(from_number, _back_to_menu_payload("❌ No patient selected."))
             return
         tests = _get_lab_tests(self.tenant_id, patient_id)
         self.sender.send_message(from_number, _fmt_lab_tests(tests))
@@ -679,7 +730,7 @@ class DoctorAgent:
         patient_id = session.get("selected_patient_id")
         patient_name = session.get("selected_patient_name", "Patient")
         if not patient_id:
-            self.sender.send_message(from_number, "❌ No patient selected. Type *menu* to start over.")
+            self.sender.send_interactive_message(from_number, _back_to_menu_payload("❌ No patient selected."))
             return
         prescriptions = _get_prescriptions(self.tenant_id, patient_id)
         self.sender.send_message(from_number, _fmt_prescriptions(prescriptions))
@@ -691,7 +742,7 @@ class DoctorAgent:
         patient_id = session.get("selected_patient_id")
         patient_name = session.get("selected_patient_name", "Patient")
         if not patient_id:
-            self.sender.send_message(from_number, "❌ No patient selected. Type *menu* to start over.")
+            self.sender.send_interactive_message(from_number, _back_to_menu_payload("❌ No patient selected."))
             return
         reports = _get_reports(self.tenant_id, patient_id)
         self.sender.send_message(from_number, _fmt_reports(reports))
@@ -753,7 +804,7 @@ class DoctorAgent:
         patient_id = session.get("selected_patient_id")
         patient_name = session.get("selected_patient_name", "Patient")
         if not patient_id:
-            self.sender.send_message(from_number, "❌ No patient selected. Type *menu* to start over.")
+            self.sender.send_interactive_message(from_number, _back_to_menu_payload("❌ No patient selected."))
             return
         appt = _get_patient_appointment_today(self.tenant_id, doctor.id, patient_id)
         if not appt:
@@ -777,7 +828,7 @@ class DoctorAgent:
     def _start_prescription_flow(self, from_number: str, session: dict, doctor):
         patient_id = session.get("selected_patient_id")
         if not patient_id:
-            self.sender.send_message(from_number, "❌ No patient selected. Type *menu* to start over.")
+            self.sender.send_interactive_message(from_number, _back_to_menu_payload("❌ No patient selected."))
             return
         session["flow"] = "RX_MEDICINE_NAME"
         session["rx_medicines"] = []
