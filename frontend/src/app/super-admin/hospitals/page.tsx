@@ -2,8 +2,8 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getTenants, updateTenant, deleteTenant } from "@/lib/api";
-import { AddHospitalModal } from "@/components/modals/AddHospitalModal";
-import { Loader2, Search, Filter, MoreVertical, Building2, MapPin, Edit, Power, Trash2 } from "lucide-react";
+import { Loader2, Search, Filter, MoreVertical, Building2, MapPin, Edit, Power, Trash2, Plus } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { 
@@ -69,7 +69,10 @@ export default function HospitalsPage() {
           <p className="text-[12px] md:text-[13px] text-[#6B7280] mt-1">Manage all registered hospital tenants on the platform.</p>
         </div>
         <div className="flex items-center gap-3 w-full sm:w-auto">
-          <AddHospitalModal />
+          <Link href="/super-admin/hospitals/new" className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background bg-primary text-primary-foreground hover:bg-primary/90 h-10 py-2 px-4 gap-2">
+            <Plus className="w-4 h-4" />
+            Add Hospital
+          </Link>
         </div>
       </div>
 

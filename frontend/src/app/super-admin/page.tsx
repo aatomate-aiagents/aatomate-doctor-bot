@@ -4,7 +4,7 @@ import { Building2, Users, ArrowUpRight, Plus, ExternalLink, MoreVertical } from
 import { useQuery } from "@tanstack/react-query";
 import { getTenants, getUsers } from "@/lib/api";
 import { Role } from "@/lib/rbac";
-import { AddHospitalModal } from "@/components/modals/AddHospitalModal";
+
 import { AddUserModal } from "@/components/modals/AddUserModal";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
@@ -43,7 +43,10 @@ export default function SuperAdminDashboard() {
         </div>
         <div className="flex items-center gap-3">
           <AddUserModal tenants={tenants || []} fixedRole={Role.SUPER_ADMIN} triggerText="Invite Admin" />
-          <AddHospitalModal />
+          <Link href="/super-admin/hospitals/new" className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background bg-primary text-primary-foreground hover:bg-primary/90 h-10 py-2 px-4 gap-2">
+            <Plus className="w-4 h-4" />
+            Add Hospital
+          </Link>
           <button className="hidden sm:flex items-center justify-center px-3 py-1.5 border border-[#E5E7EB] bg-white text-[#111827] text-[13px] font-medium rounded-md hover:bg-[#F9FAFB] transition-colors shadow-sm">
             Export Analytics
           </button>
@@ -211,22 +214,18 @@ export default function SuperAdminDashboard() {
           </div>
           <div className="p-2">
             <div className="flex flex-col space-y-1">
-              <AddHospitalModal 
-                customTrigger={
-                  <button className="w-full flex items-center justify-between px-3 py-2.5 rounded-md hover:bg-[#F9FAFB] text-left transition-colors group">
-                    <div className="flex items-center gap-3">
-                      <div className="w-7 h-7 rounded bg-blue-50 flex items-center justify-center text-blue-600">
-                        <Building2 className="w-3.5 h-3.5" />
-                      </div>
-                      <div>
-                        <p className="text-[13px] font-medium text-[#111827]">Create Hospital</p>
-                        <p className="text-[11px] text-[#6B7280]">Onboard a new clinic</p>
-                      </div>
-                    </div>
-                    <Plus className="w-4 h-4 text-[#9CA3AF] group-hover:text-blue-600 transition-colors" />
-                  </button>
-                } 
-              />
+              <Link href="/super-admin/hospitals/new" className="w-full flex items-center justify-between px-3 py-2.5 rounded-md hover:bg-[#F9FAFB] text-left transition-colors group">
+                <div className="flex items-center gap-3">
+                  <div className="w-7 h-7 rounded bg-blue-50 flex items-center justify-center text-blue-600">
+                    <Building2 className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-medium text-[#111827]">Create Hospital</p>
+                    <p className="text-[11px] text-[#6B7280]">Onboard a new clinic</p>
+                  </div>
+                </div>
+                <Plus className="w-4 h-4 text-[#9CA3AF] group-hover:text-blue-600 transition-colors" />
+              </Link>
 
               <AddUserModal 
                 tenants={tenants || []}
