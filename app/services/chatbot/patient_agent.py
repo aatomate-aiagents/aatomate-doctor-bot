@@ -117,7 +117,7 @@ class PatientAgent:
                         "flow_token": flow_token,
                         "flow_id": flow_id,
                         "flow_cta": "Book Appointment",
-                        "mode": "published",
+                        "mode": os.environ.get("WHATSAPP_FLOW_MODE", "published"),
                         "flow_action": "data_exchange"
                     }
                 }
@@ -286,7 +286,7 @@ class PatientAgent:
                         "flow_token": flow_token,
                         "flow_id": flow_id,
                         "flow_cta": "Register Now",
-                        "mode": "published",
+                        "mode": os.environ.get("WHATSAPP_FLOW_MODE", "published"),
                         "flow_action": "data_exchange"
                     }
                 }
