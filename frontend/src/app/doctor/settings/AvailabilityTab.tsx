@@ -207,6 +207,8 @@ export function AvailabilityTab({ userProfile }: { userProfile: any }) {
           availabilitySchedule[day.key] = [`${day.startTime}-${day.endTime}`];
         }
         // Inactive days won't have entries → fallback logic in flow_handler sees []
+      }
+
       let currentDoctorId = doctorId;
       if (!currentDoctorId) {
         const doctorsList = await getDoctors();
