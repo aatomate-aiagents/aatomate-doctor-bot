@@ -53,8 +53,13 @@ def update_doctor(
     if current_user.active_role == "doctor":
         # Fetch doctor
         doc = DoctorService.get_doctor(current_user.tenant_id, doctor_id)
-        if doc and doc.name == current_user.name:
-            is_self = True
+        if doc:
+            # Fetch user's name from users table
+            user_res = with_retry(lambda: db.table("users").select("name").eq("id", current_user.uid).execute())()
+            if user_res.data:
+                user_name = user_res.data[0].get("name")
+                if doc.name == user_name:
+                    is_self = True
 
     if not is_self and current_user.active_role not in ("hospital_admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Not authorized to update doctors")
