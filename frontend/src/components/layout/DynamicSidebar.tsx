@@ -18,7 +18,8 @@ import {
   Microscope,
   Stethoscope,
   LogOut,
-  BadgeCheck
+  BadgeCheck,
+  CheckSquare
 } from "lucide-react";
 
 import { UserProfile } from "@/lib/rbac";
@@ -33,6 +34,7 @@ interface SidebarItem {
   name: string;
   href: string;
   icon: any;
+  category?: string;
 }
 
 const getNavigationByRole = (role: Role): SidebarItem[] => {
@@ -56,36 +58,27 @@ const getNavigationByRole = (role: Role): SidebarItem[] => {
         { name: "Appointments", href: "/doctor/appointments", icon: Calendar },
         { name: "Patients", href: "/doctor/patients", icon: Users },
       ];
-    case Role.RECEPTIONIST:
     case Role.STAFF:
-      return [
-        { name: "Dashboard", href: "/staff", icon: LayoutDashboard },
-        { name: "Appointments", href: "/staff/appointments", icon: Calendar },
-        { name: "Walk-in Queue", href: "/staff/queue", icon: Activity },
-      ];
+    case Role.RECEPTIONIST:
     case Role.NURSE:
-      return [
-        { name: "Dashboard", href: "/staff", icon: LayoutDashboard },
-        { name: "Patient Vitals", href: "/staff/vitals", icon: Activity },
-        { name: "Doctor Queue", href: "/staff/queue", icon: Users },
-      ];
     case Role.LAB_TECHNICIAN:
-      return [
-        { name: "Dashboard", href: "/staff", icon: LayoutDashboard },
-        { name: "Pending Tests", href: "/staff/tests", icon: Microscope },
-        { name: "Reports", href: "/staff/reports", icon: FileText },
-      ];
     case Role.PHARMACIST:
-      return [
-        { name: "Dashboard", href: "/staff", icon: LayoutDashboard },
-        { name: "Prescriptions", href: "/staff/prescriptions", icon: Pill },
-        { name: "Inventory", href: "/staff/inventory", icon: Building2 },
-      ];
     case Role.BILLING_EXECUTIVE:
       return [
-        { name: "Dashboard", href: "/staff", icon: LayoutDashboard },
-        { name: "Invoices", href: "/staff/invoices", icon: FileText },
-        { name: "Payments", href: "/staff/payments", icon: CreditCard },
+        // Workspace
+        { name: "Dashboard", href: "/staff", icon: LayoutDashboard, category: "Workspace" },
+        { name: "Appointments", href: "/staff/appointments", icon: Calendar, category: "Workspace" },
+        { name: "Patients", href: "/staff/patients", icon: Users, category: "Workspace" },
+        { name: "Walk-in Queue", href: "/staff/queue", icon: Activity, category: "Workspace" },
+        // Clinical
+        { name: "Reports", href: "/staff/reports", icon: FileText, category: "Clinical" },
+        { name: "Prescriptions", href: "/staff/prescriptions", icon: Pill, category: "Clinical" },
+        // Operations
+        { name: "Payments", href: "/staff/payments", icon: CreditCard, category: "Operations" },
+        { name: "Billing", href: "/staff/invoices", icon: FileText, category: "Operations" },
+        { name: "Tasks", href: "/staff/tasks", icon: CheckSquare, category: "Operations" },
+        // Account
+        { name: "Profile & Settings", href: "/staff/settings", icon: Settings, category: "Account" },
       ];
     default:
       return [];
@@ -94,8 +87,17 @@ const getNavigationByRole = (role: Role): SidebarItem[] => {
 
 export function SidebarContent({ userProfile, onNavigate }: { userProfile: UserProfile, onNavigate?: () => void }) {
   const pathname = usePathname();
-  // Use activeRole for navigation — this is what changes when the user switches roles
   const navigation = getNavigationByRole(userProfile.activeRole);
+
+  // Group by category if present
+  const categorizedNav = navigation.reduce((acc, item) => {
+    const cat = item.category || "General";
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(item);
+    return acc;
+  }, {} as Record<string, SidebarItem[]>);
+
+  const hasCategories = navigation.some(item => item.category);
 
   const { data: tenants } = useQuery({
     queryKey: ["tenants"],
@@ -107,10 +109,37 @@ export function SidebarContent({ userProfile, onNavigate }: { userProfile: UserP
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    const ALL_COOKIES = ["vendor_session", "business_session", "staff_session", "super_admin_session", "doctor_session"];
+    for (const cookie of ALL_COOKIES) {
+      document.cookie = `${cookie}=; path=/; max-age=0`;
+    }
     localStorage.removeItem("tenantId");
     localStorage.removeItem("activeRole");
     window.location.href = "/login";
   };
+
+  const renderNavItems = (items: SidebarItem[]) => (
+    items.map((item) => {
+      // Precise path matching logic
+      const isActive = pathname === item.href || (pathname.startsWith(item.href + "/") && item.href !== "/staff");
+      return (
+        <Link
+          key={item.name}
+          href={item.href}
+          onClick={onNavigate}
+          className={cn(
+            "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all duration-200",
+            isActive 
+              ? "bg-primary/10 text-primary font-semibold shadow-sm" 
+              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+          )}
+        >
+          <item.icon className={cn("w-4 h-4", isActive ? "text-primary" : "text-muted-foreground")} />
+          {item.name}
+        </Link>
+      );
+    })
+  );
 
   return (
     <div className="flex flex-col h-full bg-sidebar text-sidebar-foreground">
@@ -132,32 +161,29 @@ export function SidebarContent({ userProfile, onNavigate }: { userProfile: UserP
         </div>
       </div>
 
-      <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
-        {navigation.map((item) => {
-          const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
-          return (
-            <Link
-              key={item.name}
-              href={item.href}
-              onClick={onNavigate}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-md transition-all duration-200",
-                isActive 
-                  ? "bg-primary/10 text-primary font-semibold" 
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}
-            >
-              <item.icon className={cn("w-4 h-4", isActive ? "text-primary" : "text-muted-foreground")} />
-              {item.name}
-            </Link>
-          );
-        })}
+      <nav className="flex-1 px-3 py-5 overflow-y-auto scrollbar-hide">
+        {hasCategories ? (
+          <div className="space-y-6">
+            {Object.entries(categorizedNav).map(([category, items]) => (
+              <div key={category} className="space-y-1">
+                <h4 className="px-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70 mb-2">
+                  {category}
+                </h4>
+                {renderNavItems(items)}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-1">
+            {renderNavItems(navigation)}
+          </div>
+        )}
       </nav>
 
-      <div className="p-4 border-t border-sidebar-border flex-shrink-0">
+      <div className="p-4 border-t border-sidebar-border flex-shrink-0 bg-background/50 backdrop-blur-sm">
         <button 
           onClick={handleLogout}
-          className="flex items-center gap-3 px-3 py-2 w-full text-sm font-medium text-muted-foreground hover:text-destructive transition-colors rounded-md hover:bg-destructive/10"
+          className="flex items-center justify-center gap-2 px-3 py-2 w-full text-sm font-semibold text-destructive hover:text-destructive-foreground transition-colors rounded-md hover:bg-destructive shadow-sm"
         >
           <LogOut className="w-4 h-4" />
           Sign Out
@@ -169,8 +195,16 @@ export function SidebarContent({ userProfile, onNavigate }: { userProfile: UserP
 
 export function MobileSidebarContent({ userProfile, onNavigate }: { userProfile: UserProfile, onNavigate?: () => void }) {
   const pathname = usePathname();
-  // Use activeRole for navigation
   const navigation = getNavigationByRole(userProfile.activeRole);
+  
+  const categorizedNav = navigation.reduce((acc, item) => {
+    const cat = item.category || "General";
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(item);
+    return acc;
+  }, {} as Record<string, SidebarItem[]>);
+
+  const hasCategories = navigation.some(item => item.category);
 
   const { data: tenants } = useQuery({
     queryKey: ["tenants"],
@@ -182,20 +216,20 @@ export function MobileSidebarContent({ userProfile, onNavigate }: { userProfile:
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    const ALL_COOKIES = ["vendor_session", "business_session", "staff_session", "super_admin_session", "doctor_session"];
+    for (const cookie of ALL_COOKIES) {
+      document.cookie = `${cookie}=; path=/; max-age=0`;
+    }
     localStorage.removeItem("tenantId");
     localStorage.removeItem("activeRole");
     window.location.href = "/login";
   };
 
-  // Framer motion variants
   const containerVariants = {
     hidden: { opacity: 0 },
     show: {
       opacity: 1,
-      transition: {
-        staggerChildren: 0.05,
-        delayChildren: 0.1,
-      }
+      transition: { staggerChildren: 0.05, delayChildren: 0.1 }
     }
   };
 
@@ -204,14 +238,31 @@ export function MobileSidebarContent({ userProfile, onNavigate }: { userProfile:
     show: { opacity: 1, x: 0, transition: { type: "spring" as const, stiffness: 300, damping: 24 } }
   };
 
-  const footerVariants = {
-    hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0, transition: { delay: 0.3, duration: 0.4 } }
-  };
+  const renderNavItems = (items: SidebarItem[]) => (
+    items.map((item) => {
+      const isActive = pathname === item.href || (pathname.startsWith(item.href + "/") && item.href !== "/staff");
+      return (
+        <motion.div key={item.name} variants={itemVariants}>
+          <Link
+            href={item.href}
+            onClick={onNavigate}
+            className={cn(
+              "flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl transition-all",
+              isActive 
+                ? "bg-primary text-primary-foreground shadow-md" 
+                : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-foreground"
+            )}
+          >
+            <item.icon className={cn("w-5 h-5", isActive ? "text-primary-foreground" : "text-slate-400")} />
+            {item.name}
+          </Link>
+        </motion.div>
+      );
+    })
+  );
 
   return (
     <div className="flex flex-col h-full bg-slate-50 dark:bg-card text-foreground overflow-hidden">
-      {/* Header */}
       <div className="p-6 flex-shrink-0 bg-card border-b border-border shadow-sm relative z-10">
         <div className="flex items-center justify-center mb-6">
           <Image 
@@ -240,93 +291,47 @@ export function MobileSidebarContent({ userProfile, onNavigate }: { userProfile:
         </div>
       </div>
 
-      {/* Mobile Role Switcher — only shows for multi-role users */}
       <MobileRoleSwitcher />
 
-      {/* Navigation */}
       <motion.nav 
         variants={containerVariants}
         initial="hidden"
         animate="show"
-        className="flex-1 px-4 py-6 space-y-2 overflow-y-auto"
+        className="flex-1 px-4 py-6 overflow-y-auto scrollbar-hide relative z-0"
       >
-        {navigation.map((item) => {
-          const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
-          return (
-            <motion.div key={item.name} variants={itemVariants}>
-              <Link
-                href={item.href}
-                onClick={onNavigate}
-                className="block outline-none"
-              >
-                <motion.div
-                  whileHover={{ y: -2, scale: 0.99 }}
-                  whileTap={{ scale: 0.97 }}
-                  className={cn(
-                    "flex items-center gap-3 px-4 py-3 rounded-[20px] transition-all duration-300 relative overflow-hidden group border",
-                    isActive 
-                      ? "bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-900/50 shadow-sm text-blue-700 dark:text-blue-400 font-semibold" 
-                      : "bg-transparent border-transparent text-muted-foreground hover:bg-white dark:hover:bg-muted/50 hover:shadow-sm hover:border-border/50 hover:text-foreground"
-                  )}
-                >
-                  {isActive && (
-                    <motion.div 
-                      layoutId="active-nav-indicator"
-                      className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500 rounded-r-full"
-                    />
-                  )}
-                  
-                  <div className={cn(
-                    "w-8 h-8 rounded-full flex items-center justify-center transition-colors relative z-10",
-                    isActive ? "bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400" : "bg-muted/50 text-muted-foreground group-hover:bg-muted group-hover:text-foreground"
-                  )}>
-                    <item.icon className="w-4 h-4" />
-                  </div>
-                  
-                  <span className="flex-1 text-[15px] relative z-10">{item.name}</span>
-                  
-                  {/* Mock badges for specific items */}
-                  {item.name === "Reports" && (
-                    <span className="w-2 h-2 rounded-full bg-red-500 relative z-10"></span>
-                  )}
-                </motion.div>
-              </Link>
-            </motion.div>
-          );
-        })}
+        {hasCategories ? (
+          <div className="space-y-6">
+            {Object.entries(categorizedNav).map(([category, items]) => (
+              <div key={category} className="space-y-2">
+                <motion.h4 variants={itemVariants} className="px-2 text-[11px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                  {category}
+                </motion.h4>
+                <div className="space-y-1.5">
+                  {renderNavItems(items)}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {renderNavItems(navigation)}
+          </div>
+        )}
       </motion.nav>
 
-      {/* Footer */}
       <motion.div 
-        variants={footerVariants}
-        initial="hidden"
-        animate="show"
-        className="p-4 mt-auto border-t border-border/50 bg-white dark:bg-card relative z-10"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3, duration: 0.4 }}
+        className="p-6 bg-card border-t border-border flex-shrink-0"
       >
-        <div className="bg-slate-50 dark:bg-muted/30 p-3 rounded-[20px] border border-border/50 flex items-center justify-between shadow-sm">
-          <div className="flex items-center gap-3 overflow-hidden">
-            <Avatar className="w-10 h-10 ring-2 ring-background shadow-sm border border-border/50">
-              <AvatarFallback className="bg-primary/10 text-primary font-bold text-sm">
-                {userProfile.name.substring(0, 2).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <div className="truncate">
-              <p className="text-sm font-bold text-foreground truncate">{userProfile.name}</p>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                <p className="text-xs text-muted-foreground">Online</p>
-              </div>
-            </div>
-          </div>
-          
-          <button 
-            onClick={handleLogout}
-            className="p-2.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-destructive/20"
-            title="Sign Out"
-          >
-            <LogOut className="w-5 h-5" />
-          </button>
-        </div>
+        <button 
+          onClick={handleLogout}
+          className="flex items-center justify-center gap-2 w-full px-4 py-3 font-semibold text-destructive border-2 border-destructive/20 bg-destructive/5 hover:bg-destructive hover:text-destructive-foreground rounded-xl transition-all shadow-sm"
+        >
+          <LogOut className="w-5 h-5" />
+          Sign Out Securely
+        </button>
       </motion.div>
     </div>
   );
@@ -334,8 +339,13 @@ export function MobileSidebarContent({ userProfile, onNavigate }: { userProfile:
 
 export function DynamicSidebar({ userProfile }: { userProfile: UserProfile }) {
   return (
-    <div className="hidden md:flex flex-col w-64 bg-sidebar text-sidebar-foreground h-screen fixed left-0 top-0 border-r border-sidebar-border shadow-sm z-30">
-      <SidebarContent userProfile={userProfile} />
-    </div>
+    <>
+      <div className="hidden md:flex h-full w-64 flex-col fixed inset-y-0 z-50">
+        <SidebarContent userProfile={userProfile} />
+      </div>
+      <div className="md:hidden">
+        {/* Mobile sidebar handles its own rendering usually, or rely on DashboardLayout */}
+      </div>
+    </>
   );
 }

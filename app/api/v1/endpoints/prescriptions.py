@@ -119,3 +119,33 @@ async def verify_prescription(
         
     # TODO: In Phase 4, trigger WhatsApp notification here
     return updated
+
+@router.post("/draft", response_model=PrescriptionInDB)
+async def create_prescription_draft(
+    draft_data: dict,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """
+    Allows staff to manually create a prescription draft for a doctor to review.
+    """
+    # Force status to needs_verification (pending review)
+    draft_data["status"] = "needs_verification"
+    draft_data["ocr_provider"] = "manual_draft"
+    
+    # Save to DB
+    saved_presc = PrescriptionService.create_prescription(current_user.tenant_id, draft_data)
+    
+    if not saved_presc:
+        raise HTTPException(status_code=500, detail="Failed to create prescription draft")
+        
+    # Link to Appointment if provided
+    appointment_id = draft_data.get("appointment_id")
+    if appointment_id:
+        from app.db.supabase import db
+        from app.db.retry import with_retry
+        if db:
+            with_retry(lambda: db.table("appointments").update({
+                "prescription_id": saved_presc.id
+            }).eq("tenant_id", current_user.tenant_id).eq("id", appointment_id).execute())()
+            
+    return saved_presc

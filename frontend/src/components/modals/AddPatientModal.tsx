@@ -22,9 +22,10 @@ import { api } from "@/lib/api";
 
 interface AddPatientModalProps {
   trigger?: React.ReactNode;
+  triggerText?: string;
 }
 
-export function AddPatientModal({ trigger }: AddPatientModalProps) {
+export function AddPatientModal({ trigger, triggerText }: AddPatientModalProps) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");

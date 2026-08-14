@@ -12,7 +12,7 @@ import { Loader2, User, Phone, Mail, Stethoscope, Clock, Shield } from "lucide-r
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSearchParams, useRouter } from "next/navigation";
 
-export default function DoctorSettingsPage() {
+export default function StaffSettingsPage() {
   const { userProfile, user } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
