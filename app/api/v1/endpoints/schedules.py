@@ -49,3 +49,20 @@ def get_available_slots(
     accounting for existing locked/booked appointments, breaks, and holidays.
     """
     return ScheduleService.get_available_slots(current_user.tenant_id, doctor_id, target_date)
+    
+@router.get("/holidays/{doctor_id}", response_model=List[DoctorHolidayInDB])
+def get_all_doctor_holidays(doctor_id: str, current_user: CurrentUser = Depends(get_current_user)):
+    """
+    Get all holidays for a doctor.
+    """
+    return ScheduleService.get_all_doctor_holidays(current_user.tenant_id, doctor_id)
+
+@router.delete("/holidays/{holiday_id}")
+def delete_holiday(holiday_id: str, current_user: CurrentUser = Depends(get_current_user)):
+    """
+    Delete a holiday.
+    """
+    success = ScheduleService.delete_holiday(current_user.tenant_id, holiday_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Holiday not found")
+    return {"status": "success"}

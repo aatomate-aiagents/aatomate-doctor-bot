@@ -80,6 +80,31 @@ class ScheduleService:
         return holidays
 
     @staticmethod
+    def get_all_doctor_holidays(tenant_id: str, doctor_id: str) -> List[DoctorHolidayInDB]:
+        if not db: return []
+        
+        response = with_retry(lambda: db.table("doctor_holidays").select("*").eq("tenant_id", tenant_id).eq("doctor_id", doctor_id).execute())()
+        holidays = []
+        if response.data:
+            for row in response.data:
+                if isinstance(row.get('date'), str):
+                    row['date'] = datetime.strptime(row['date'], "%Y-%m-%d").date()
+                if 'holiday_type' in row:
+                    val = row['holiday_type']
+                    if val == 'time_off':
+                        val = 'partial_day'
+                    row['type'] = val
+                holidays.append(DoctorHolidayInDB(**row))
+        return holidays
+
+    @staticmethod
+    def delete_holiday(tenant_id: str, holiday_id: str) -> bool:
+        if not db: return False
+        
+        response = with_retry(lambda: db.table("doctor_holidays").delete().eq("tenant_id", tenant_id).eq("id", holiday_id).execute())()
+        return len(response.data) > 0
+
+    @staticmethod
     def get_available_slots(tenant_id: str, doctor_id: str, target_date: date) -> List[AppointmentSlotBase]:
         """
         Dynamically calculates available slots for a given doctor on a given date.

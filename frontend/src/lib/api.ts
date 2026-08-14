@@ -148,6 +148,14 @@ export const createDoctorHoliday = async (data: any): Promise<any> => {
   })).data;
 };
 
+export const getDoctorHolidays = async (doctorId: string): Promise<any[]> => {
+  return (await api.get(`/schedules/holidays/${doctorId}`)).data;
+};
+
+export const deleteDoctorHoliday = async (holidayId: string): Promise<void> => {
+  await api.delete(`/schedules/holidays/${holidayId}`);
+};
+
 // Add more API endpoints matching the python backend (laboratory.py, patients, etc.) as needed
 
 export const getAvailableSlots = async (doctorId: string, targetDate: string, tenantId?: string): Promise<any[]> => {

@@ -48,7 +48,15 @@ def update_doctor(
     Update doctor profile including whatsapp_number.
     Only hospital_admin or super_admin may update doctors.
     """
-    if current_user.active_role not in ("hospital_admin", "super_admin"):
+    # Allow doctor to update their own record, or hospital_admin/super_admin to update any
+    is_self = False
+    if current_user.active_role == "doctor":
+        # Fetch doctor
+        doc = DoctorService.get_doctor(current_user.tenant_id, doctor_id)
+        if doc and doc.name == current_user.name:
+            is_self = True
+
+    if not is_self and current_user.active_role not in ("hospital_admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Not authorized to update doctors")
 
     if not db:

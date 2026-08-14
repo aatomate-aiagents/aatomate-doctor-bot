@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Clock, CalendarX, Plus, Trash2, Loader2, Save, Globe } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
+import { updateDoctor, getDoctorHolidays, deleteDoctorHoliday, createDoctorHoliday } from "@/lib/api";
 
 const ALL_TIMEZONES = [
   "Asia/Kolkata",
@@ -131,17 +132,17 @@ export function AvailabilityTab({ userProfile }: { userProfile: any }) {
         if (avail._timezone) setTimezone(avail._timezone);
         if (avail._slot_duration) setSlotDuration(String(avail._slot_duration));
 
-        // Load holidays from relational table
-        const { data: holidayData } = await supabase
-          .from("doctor_holidays")
-          .select("id, date, reason, start_time, end_time")
-          .eq("doctor_id", docData.id)
-          .eq("tenant_id", userProfile?.tenantId);
-
-        if (holidayData) {
-          setOverrides(holidayData);
-        } else if (avail._overrides) {
-          setOverrides(avail._overrides);
+        // Load holidays from REST API
+        try {
+          const holidayData = await getDoctorHolidays(docData.id);
+          if (holidayData) {
+            setOverrides(holidayData);
+          }
+        } catch (hErr) {
+          console.error("Failed to load holidays from API", hErr);
+          if (avail._overrides) {
+            setOverrides(avail._overrides);
+          }
         }
 
         // Parse day schedule
@@ -210,46 +211,40 @@ export function AvailabilityTab({ userProfile }: { userProfile: any }) {
       }
 
       const userName = userProfile?.name;
-      const { error } = await supabase
-        .from("doctors")
-        .update({ availability_schedule: availabilitySchedule })
-        .eq("name", userName)
-        .eq("tenant_id", userProfile?.tenantId);
+      if (!doctorId) throw new Error("Doctor ID not found");
+      
+      // Update doctor availability schedule using backend API (bypasses RLS)
+      await updateDoctor(
+        doctorId,
+        { availability_schedule: availabilitySchedule },
+        userProfile?.tenantId
+      );
 
-      if (error) throw error;
-
-      if (doctorId) {
-        const { data: existing } = await supabase
-          .from("doctor_holidays")
-          .select("id")
-          .eq("doctor_id", doctorId);
-          
-        const currentIds = overrides.map((o) => o.id);
-        const toDelete = existing?.map((e) => e.id).filter((id) => !currentIds.includes(id)) || [];
-        
-        if (toDelete.length > 0) {
-          await supabase.from("doctor_holidays").delete().in("id", toDelete);
-        }
-
-        const toUpsert = overrides.map((o) => {
-          const isUUID = o.id.includes("-") && o.id.length > 20;
-          return {
-            id: isUUID ? o.id : undefined,
-            doctor_id: doctorId,
-            tenant_id: userProfile?.tenantId,
-            date: o.date,
-            reason: o.reason,
-            start_time: o.start_time || null,
-            end_time: o.end_time || null,
-            holiday_type: "time_off",
-          };
-        });
-
-        if (toUpsert.length > 0) {
-          const { error: upsertErr } = await supabase.from("doctor_holidays").upsert(toUpsert);
-          if (upsertErr) console.error("Failed to sync holidays", upsertErr);
-        }
+      // Sync overrides to doctor_holidays using backend API
+      const existing = await getDoctorHolidays(doctorId);
+      
+      // Identify which ones to delete
+      const currentIds = overrides.map((o) => o.id);
+      const toDelete = existing.filter((h) => !h.start_time || !currentIds.includes(h.id));
+      
+      for (const h of toDelete) {
+        await deleteDoctorHoliday(h.id);
       }
+
+      // Identify which ones to insert (only admin overrides which have no start_time)
+      const toInsert = overrides.filter((o) => !o.start_time);
+      for (const o of toInsert) {
+        await createDoctorHoliday({
+          doctor_id: doctorId,
+          tenant_id: userProfile?.tenantId,
+          date: o.date,
+          reason: o.reason,
+          holiday_type: "full_day",
+        });
+      }
+
+      // Reload schedule to fetch clean IDs from database
+      await loadSchedule();
 
       toast.success("Schedule & Availability saved successfully!");
     } catch (err: any) {
