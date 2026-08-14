@@ -69,23 +69,23 @@ def _get_available_dates(doctor_id: str, tenant_id: str, days_ahead: int = 14) -
     except Exception:
         work_days = set()
 
-    # Also check fallback schedule if no structured schedule exists
-    if not work_days:
-        try:
-            doc_res = with_retry(
-                lambda: db.table("doctors")
-                .select("availability_schedule")
-                .eq("id", doctor_id)
-                .execute()
-            )()
-            doc = doc_res.data[0] if doc_res.data else None
-            avail = doc.get("availability_schedule", {}) if doc else {}
-            DAY_NAMES = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
-            for i, day in enumerate(DAY_NAMES):
-                if avail.get(day):
-                    work_days.add(i)
-        except Exception:
-            pass
+    # Always merge fallback schedule if it exists, since doctors might have 
+    # partial structured schedules and partial JSON schedules (or only JSON).
+    try:
+        doc_res = with_retry(
+            lambda: db.table("doctors")
+            .select("availability_schedule")
+            .eq("id", doctor_id)
+            .execute()
+        )()
+        doc = doc_res.data[0] if doc_res.data else None
+        avail = doc.get("availability_schedule", {}) if doc else {}
+        DAY_NAMES = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+        for i, day in enumerate(DAY_NAMES):
+            if avail.get(day):
+                work_days.add(i)
+    except Exception:
+        pass
 
     if not work_days:
         work_days = {0, 1, 2, 3, 4}  # Fallback to weekdays
@@ -145,10 +145,11 @@ def _get_available_slots(doctor_id: str, tenant_id: str, date_str: str) -> List[
                 # Parse "09:00-17:00" style ranges into a pseudo schedule
                 first_range = ranges[0]
                 start_str, end_str = first_range.split("-")
+                slot_duration = avail.get("_slot_duration", 30)
                 sched = {
                     "start_time": start_str.strip(),
                     "end_time": end_str.strip(),
-                    "slot_duration_minutes": 30,
+                    "slot_duration_minutes": int(slot_duration),
                     "break_start": None,
                     "break_end": None,
                 }
