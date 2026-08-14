@@ -60,10 +60,12 @@ export function Topbar({ userProfile }: { userProfile: UserProfile }) {
         {/* Role Switcher — only shows when user has multiple roles */}
         <RoleSwitcher />
 
-        <button className="p-2 hover:bg-muted rounded-full text-muted-foreground relative transition-colors">
-          <Bell className="w-5 h-5" />
-          <span className="absolute top-2 right-2 w-2 h-2 bg-destructive rounded-full border-2 border-card"></span>
-        </button>
+        {userProfile.activeRole !== 'doctor' && (
+          <button className="p-2 hover:bg-muted rounded-full text-muted-foreground relative transition-colors">
+            <Bell className="w-5 h-5" />
+            <span className="absolute top-2 right-2 w-2 h-2 bg-destructive rounded-full border-2 border-card"></span>
+          </button>
+        )}
 
         <DropdownMenu>
           <DropdownMenuTrigger className="focus:outline-none">
@@ -82,8 +84,8 @@ export function Topbar({ userProfile }: { userProfile: UserProfile }) {
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>My Account</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Profile Settings</DropdownMenuItem>
-            <DropdownMenuItem>Preferences</DropdownMenuItem>
+            <DropdownMenuItem className="cursor-pointer" onClick={() => router.push(`/${userProfile.activeRole === 'super_admin' ? 'super-admin' : userProfile.activeRole}/settings`)}>Profile Settings</DropdownMenuItem>
+            <DropdownMenuItem className="cursor-pointer" onClick={() => router.push(`/${userProfile.activeRole === 'super_admin' ? 'super-admin' : userProfile.activeRole}/settings?tab=preferences`)}>Preferences</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"

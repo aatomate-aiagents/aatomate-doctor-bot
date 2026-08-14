@@ -340,11 +340,12 @@ export default function DoctorDashboard() {
                   </Button>
                 </div>
               ) : (
-                <div className="p-6 sm:p-8 text-center bg-background rounded-xl border border-dashed">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-muted rounded-full flex items-center justify-center mx-auto mb-2 sm:mb-3">
-                    <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 text-muted-foreground" />
+                <div className="p-4 sm:p-6 text-center bg-background rounded-xl border border-dashed shadow-sm">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-emerald-50 dark:bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-2 sm:mb-3">
+                    <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
                   </div>
-                  <p className="text-xs sm:text-sm text-muted-foreground font-medium">Queue is empty</p>
+                  <h4 className="font-semibold text-slate-900 dark:text-white text-sm">You're all caught up</h4>
+                  <p className="text-[11px] sm:text-xs text-muted-foreground font-medium mt-1">No patients are waiting right now.</p>
                 </div>
               )}
             </CardContent>
@@ -430,7 +431,7 @@ export default function DoctorDashboard() {
                               </Avatar>
                               <div>
                                 <h4 className="text-sm sm:text-base font-semibold text-foreground flex items-center gap-1.5 sm:gap-2">
-                                  {patient ? patient.name : `Patient #${appt.patient_id.substring(0, 6)}`}
+                                  {patient ? patient.name : "Unnamed Patient"}
                                   {isNext && <Badge variant="default" className="h-4 sm:h-5 px-1 sm:px-1.5 text-[9px] sm:text-[10px] uppercase tracking-wider bg-primary">Next</Badge>}
                                 </h4>
                                 <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-muted-foreground">

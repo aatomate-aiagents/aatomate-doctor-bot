@@ -62,7 +62,7 @@ export default function WalkInQueuePage() {
                         <TableCell className="font-medium">{appt.appointment_time}</TableCell>
                         <TableCell>
                           <div className="flex flex-col">
-                            <span className="font-medium">{patient ? patient.name : `Patient #${appt.patient_id.substring(0,6)}`}</span>
+                            <span className="font-medium">{patient ? patient.name : "Unnamed Patient"}</span>
                             {patient?.phone && <span className="text-xs text-muted-foreground">{patient.phone}</span>}
                           </div>
                         </TableCell>

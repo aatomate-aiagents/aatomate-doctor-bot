@@ -1148,6 +1148,19 @@ class PatientAgent:
                                                 end_time_obj = start_time_obj + timedelta(minutes=30)
                                                 end_time_str = end_time_obj.strftime("%H:%M:%S")
 
+                                                # --- FIX: Ensure patient exists before creating appointment ---
+                                                existing_patient = db.table("patients").select("id").eq("id", patient_id_db).execute()
+                                                if not existing_patient.data:
+                                                    # Auto-create patient record for this appointment to prevent "Patient #UUID" UI bugs
+                                                    db.table("patients").insert({
+                                                        "id": patient_id_db,
+                                                        "tenant_id": tenant_id,
+                                                        "name": profile_name or "Unnamed Patient",
+                                                        "mobile_number": from_number,
+                                                        "gender": "unknown"
+                                                    }).execute()
+                                                # --------------------------------------------------------------
+
                                                 if reschedule_id:
                                                     db.table("appointments").update({
                                                         "doctor_id": doctor,

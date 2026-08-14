@@ -53,9 +53,11 @@ export default function DoctorAppointmentsPage() {
       const lowerQuery = searchQuery.toLowerCase();
       filtered = filtered.filter(appt => {
         const patient = patients?.find(p => p.id === appt.patient_id);
-        return patient?.name.toLowerCase().includes(lowerQuery) || 
-               patient?.phone?.includes(lowerQuery) ||
-               appt.reason?.toLowerCase().includes(lowerQuery);
+        return (patient?.name?.toLowerCase().includes(lowerQuery)) || 
+               (patient?.phone?.includes(lowerQuery)) ||
+               (appt.reason?.toLowerCase().includes(lowerQuery)) ||
+               (appt.patient_id.toLowerCase().includes(lowerQuery)) ||
+               (patient?.id?.toLowerCase().includes(lowerQuery));
       });
     }
 
@@ -274,7 +276,7 @@ export default function DoctorAppointmentsPage() {
                           <div className="flex-1 min-w-0">
                             <div className="flex justify-between items-start">
                               <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white truncate pr-2">
-                                {patient ? patient.name : `Patient #${appt.patient_id.substring(0, 6)}`}
+                                {patient ? patient.name : "Unnamed Patient"}
                               </h3>
                               <div className="shrink-0 scale-90 origin-top-right">
                                 {getStatusBadge(appt.status)}
