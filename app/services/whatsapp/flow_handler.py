@@ -55,7 +55,7 @@ def _get_doctors_for_specialty(doctors: List[Dict], specialty: str) -> List[Dict
 
 
 def _get_available_dates(doctor_id: str, tenant_id: str, days_ahead: int = 14) -> List[Dict]:
-    """Return the next `days_ahead` days that the doctor has a schedule."""
+    """Return the next `days_ahead` days that the doctor has a schedule AND has available slots."""
     try:
         # Get the doctor's weekly schedule (day_of_week: 0=Mon … 6=Sun)
         res = with_retry(
@@ -67,8 +67,28 @@ def _get_available_dates(doctor_id: str, tenant_id: str, days_ahead: int = 14) -
         )()
         work_days = {r["day_of_week"] for r in (res.data or [])}
     except Exception:
-        # Fallback: offer weekdays
-        work_days = {0, 1, 2, 3, 4}
+        work_days = set()
+
+    # Also check fallback schedule if no structured schedule exists
+    if not work_days:
+        try:
+            doc_res = with_retry(
+                lambda: db.table("doctors")
+                .select("availability_schedule")
+                .eq("id", doctor_id)
+                .execute()
+            )()
+            doc = doc_res.data[0] if doc_res.data else None
+            avail = doc.get("availability_schedule", {}) if doc else {}
+            DAY_NAMES = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+            for i, day in enumerate(DAY_NAMES):
+                if avail.get(day):
+                    work_days.add(i)
+        except Exception:
+            pass
+
+    if not work_days:
+        work_days = {0, 1, 2, 3, 4}  # Fallback to weekdays
 
     today = date.today()
     dates = []
@@ -77,7 +97,10 @@ def _get_available_dates(doctor_id: str, tenant_id: str, days_ahead: int = 14) -
         d = today + timedelta(days=i)
         # Python weekday(): 0=Mon … 6=Sun
         if d.weekday() in work_days or not work_days:
-            dates.append({"id": d.isoformat(), "title": d.strftime("%a, %d %b %Y")})
+            # Check if this date actually has any slots left
+            slots = _get_available_slots(doctor_id, tenant_id, d.isoformat())
+            if slots:
+                dates.append({"id": d.isoformat(), "title": d.strftime("%a, %d %b %Y")})
         if len(dates) >= 7:
             break
     return dates
