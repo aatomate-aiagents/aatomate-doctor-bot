@@ -125,7 +125,7 @@ export default function StaffPrescriptionsPage() {
                       <TableCell>
                         <Badge variant={
                           presc.status === 'approved' ? 'success' : 
-                          isPending ? 'warning' : 'secondary'
+                          isPending ? 'secondary' : 'secondary'
                         } className="capitalize px-2.5 py-0.5 text-xs font-semibold rounded-full flex items-center w-fit gap-1">
                           {presc.status === 'approved' ? <CheckCircle2 className="w-3 h-3" /> : isPending ? <AlertCircle className="w-3 h-3" /> : null}
                           {isPending ? 'Pending Review' : presc.status}

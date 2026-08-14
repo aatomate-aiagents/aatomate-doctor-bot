@@ -154,25 +154,25 @@ export default function StaffQueuePage() {
                       </TableCell>
                       <TableCell>
                         <Badge variant={
-                          appt.status === 'in_consultation' ? 'default' : 
-                          appt.status === 'waiting' || appt.status === 'checked-in' ? 'warning' : 'secondary'
-                        } className={`capitalize px-2.5 py-0.5 text-xs font-semibold rounded-full ${appt.status === 'in_consultation' ? 'bg-blue-500' : ''}`}>
+                          (appt.status as string) === 'in_consultation' ? 'default' : 
+                          (appt.status as string) === 'waiting' || (appt.status as string) === 'checked-in' ? 'secondary' : 'secondary'
+                        } className={`capitalize px-2.5 py-0.5 text-xs font-semibold rounded-full ${(appt.status as string) === 'in_consultation' ? 'bg-blue-500' : ''}`}>
                           {appt.status}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
-                           {(appt.status === 'scheduled' || appt.status === 'pending') && (
+                           {((appt.status as string) === 'scheduled' || (appt.status as string) === 'pending') && (
                             <Button size="sm" onClick={() => updateStatus.mutate({ id: appt.id, status: 'waiting' })} className="h-8 rounded-full text-xs font-medium px-4 bg-emerald-500 hover:bg-emerald-600 text-white">
                               Mark Waiting
                             </Button>
                           )}
-                          {(appt.status === 'waiting' || appt.status === 'checked-in') && (
+                          {((appt.status as string) === 'waiting' || (appt.status as string) === 'checked-in') && (
                             <Button size="sm" onClick={() => updateStatus.mutate({ id: appt.id, status: 'in_consultation' })} className="h-8 rounded-full text-xs font-medium px-4 bg-blue-500 hover:bg-blue-600 text-white">
                               <Play className="w-3.5 h-3.5 mr-1" /> Start Visit
                             </Button>
                           )}
-                          {appt.status === 'in_consultation' && (
+                          {(appt.status as string) === 'in_consultation' && (
                             <Button size="sm" onClick={() => updateStatus.mutate({ id: appt.id, status: 'completed' })} className="h-8 rounded-full text-xs font-medium px-4 bg-slate-900 dark:bg-slate-100 dark:text-slate-900 hover:bg-slate-800 text-white shadow-sm">
                               <CheckSquare className="w-3.5 h-3.5 mr-1" /> Complete
                             </Button>

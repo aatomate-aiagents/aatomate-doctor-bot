@@ -60,10 +60,10 @@ export function CreatePrescriptionDraftModal() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button className="h-10 rounded-full font-medium shadow-sm bg-purple-600 hover:bg-purple-700 text-white">
+      <DialogTrigger className="inline-flex items-center justify-center whitespace-nowrap h-10 rounded-full font-medium shadow-sm bg-purple-600 hover:bg-purple-700 text-white px-4 py-2">
+        
           <Plus className="w-4 h-4 mr-2" /> New Draft Request
-        </Button>
+        
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>

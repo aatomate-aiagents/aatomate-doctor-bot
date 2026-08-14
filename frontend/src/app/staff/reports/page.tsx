@@ -117,7 +117,7 @@ export default function StaffReportsPage() {
                       <TableCell>
                         <Badge variant={
                           report.status === 'completed' ? 'success' : 
-                          isPending ? 'warning' : 'secondary'
+                          isPending ? 'secondary' : 'secondary'
                         } className="capitalize px-2.5 py-0.5 text-xs font-semibold rounded-full">
                           {report.status}
                         </Badge>

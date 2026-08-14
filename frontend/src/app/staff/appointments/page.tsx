@@ -58,7 +58,7 @@ export default function StaffAppointmentsPage() {
     }
 
     if (statusFilter !== "all") {
-      filtered = filtered.filter(appt => appt.status === statusFilter);
+      filtered = filtered.filter(appt => (appt.status as string) === statusFilter);
     }
 
     return filtered.slice().sort((a, b) => {
@@ -143,7 +143,7 @@ export default function StaffAppointmentsPage() {
             <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
               <Filter className="w-4 h-4" /> Filter:
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val || "all")}>
               <SelectTrigger className="w-[140px] h-10 rounded-full bg-white dark:bg-slate-900">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
@@ -218,16 +218,16 @@ export default function StaffAppointmentsPage() {
                       </TableCell>
                       <TableCell>
                         <Badge variant={
-                          appt.status === 'completed' ? 'success' : 
-                          appt.status === 'cancelled' ? 'destructive' : 
-                          appt.status === 'waiting' || appt.status === 'checked-in' ? 'warning' : 'default'
+                          (appt.status as string) === 'completed' ? 'success' : 
+                          (appt.status as string) === 'cancelled' ? 'destructive' : 
+                          (appt.status as string) === 'waiting' || (appt.status as string) === 'checked-in' ? 'secondary' : 'default'
                         } className="capitalize px-2.5 py-0.5 text-xs font-semibold rounded-full">
                           {appt.status}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
-                          {(appt.status === 'scheduled' || appt.status === 'pending') && (
+                          {((appt.status as string) === 'scheduled' || (appt.status as string) === 'pending') && (
                             <Button size="sm" onClick={() => updateStatus.mutate({ id: appt.id, status: 'waiting' })} className="h-8 rounded-full text-xs font-medium px-4 shadow-sm bg-primary hover:bg-primary/90 text-white">
                               Check In
                             </Button>
