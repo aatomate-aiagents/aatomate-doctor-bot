@@ -71,6 +71,11 @@ class ScheduleService:
             for row in response.data:
                 if isinstance(row.get('date'), str):
                     row['date'] = datetime.strptime(row['date'], "%Y-%m-%d").date()
+                if 'holiday_type' in row:
+                    val = row['holiday_type']
+                    if val == 'time_off':
+                        val = 'partial_day'
+                    row['type'] = val
                 holidays.append(DoctorHolidayInDB(**row))
         return holidays
 
@@ -86,14 +91,15 @@ class ScheduleService:
         schedules = ScheduleService.get_doctor_schedules(tenant_id, doctor_id)
         schedule_for_day = next((s for s in schedules if s.day_of_week == day_of_week), None)
 
+        holidays = ScheduleService.get_doctor_holidays(tenant_id, doctor_id, target_date)
+        
         if schedule_for_day:
             # 2a. Use structured schedule (existing path)
-            holidays = ScheduleService.get_doctor_holidays(tenant_id, doctor_id, target_date)
             generated_slots = SlotGeneratorService.generate_slots(schedule_for_day, target_date, holidays)
         else:
             # 2b. Fallback: read availability_schedule from the doctor document
             generated_slots = ScheduleService._slots_from_doctor_availability(
-                tenant_id, doctor_id, target_date)
+                tenant_id, doctor_id, target_date, holidays)
 
         if not generated_slots:
             return []
@@ -115,6 +121,7 @@ class ScheduleService:
     @staticmethod
     def _slots_from_doctor_availability(
         tenant_id: str, doctor_id: str, target_date: date,
+        holidays: List[DoctorHolidayInDB],
         slot_minutes: int = 30, buffer_minutes: int = 0
     ) -> List[AppointmentSlotBase]:
         """
@@ -125,6 +132,11 @@ class ScheduleService:
         from app.services.doctor_service import DoctorService
         doctor = DoctorService.get_doctor(tenant_id, doctor_id)
         if not doctor or not doctor.availability_schedule:
+            return []
+
+        # 2. Check full day holidays
+        from app.services.slot_generator import SlotGeneratorService
+        if any(h.type == HolidayType.FULL_DAY for h in holidays):
             return []
 
         day_name = ScheduleService.DAY_NAMES[target_date.weekday()]
@@ -156,16 +168,20 @@ class ScheduleService:
 
             while current + slot_td <= end_td:
                 slot_end = current + slot_td
-                start_s  = f"{int(current.total_seconds()//3600):02d}:{int((current.total_seconds()%3600)//60):02d}"
-                end_s    = f"{int(slot_end.total_seconds()//3600):02d}:{int((slot_end.total_seconds()%3600)//60):02d}"
-                slots.append(AppointmentSlotBase(
-                    doctor_id=doctor_id,
-                    tenant_id=tenant_id,
-                    date=target_date,
-                    start_time=start_s,
-                    end_time=end_s,
-                    status=SlotStatus.AVAILABLE,
-                ))
+                
+                is_holiday = SlotGeneratorService._is_holiday_overlap(current, slot_end, holidays)
+                
+                if not is_holiday:
+                    start_s  = f"{int(current.total_seconds()//3600):02d}:{int((current.total_seconds()%3600)//60):02d}"
+                    end_s    = f"{int(slot_end.total_seconds()//3600):02d}:{int((slot_end.total_seconds()%3600)//60):02d}"
+                    slots.append(AppointmentSlotBase(
+                        doctor_id=doctor_id,
+                        tenant_id=tenant_id,
+                        date=target_date,
+                        start_time=start_s,
+                        end_time=end_s,
+                        status=SlotStatus.AVAILABLE,
+                    ))
                 current = slot_end + buffer_td
 
         return slots
