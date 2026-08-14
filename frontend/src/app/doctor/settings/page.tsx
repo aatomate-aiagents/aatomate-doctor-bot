@@ -11,6 +11,7 @@ import { supabase } from "@/lib/supabase";
 import { Loader2, User, Phone, Mail, Stethoscope, Clock, Shield } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSearchParams, useRouter } from "next/navigation";
+import { AvailabilityTab } from "./AvailabilityTab";
 
 export default function DoctorSettingsPage() {
   const { userProfile, user } = useAuth();
@@ -114,6 +115,10 @@ export default function DoctorSettingsPage() {
             <Shield className="w-4 h-4 mr-2" />
             Account & Security
           </TabsTrigger>
+          <TabsTrigger value="availability" className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 rounded-md">
+            <Clock className="w-4 h-4 mr-2" />
+            Schedule & Availability
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile">
@@ -201,6 +206,10 @@ export default function DoctorSettingsPage() {
           </Card>
         </TabsContent>
         
+        <TabsContent value="availability">
+          <AvailabilityTab userProfile={userProfile} />
+        </TabsContent>
+
         <TabsContent value="preferences">
            <Card className="border-slate-200 dark:border-slate-800 shadow-sm rounded-xl overflow-hidden">
             <CardHeader className="bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800">

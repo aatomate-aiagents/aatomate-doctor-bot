@@ -2,35 +2,34 @@
 
 import { useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, Search, Filter, Phone, FileText, CheckCircle2, Clock, CalendarX, Plus, Stethoscope, Navigation, Pill } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { Loader2, Search, Filter, Phone, CheckCircle2, Clock, CalendarX, Plus, Stethoscope, ChevronRight, Activity, X } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getAppointments, getPatients } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
-import { UploadPrescriptionModal } from "@/components/modals/UploadPrescriptionModal";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { BookAppointmentModal } from "@/components/modals/BookAppointmentModal";
 import { toast } from "sonner";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const containerVariants = {
   hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: { staggerChildren: 0.1 }
-  }
+  show: { opacity: 1, transition: { staggerChildren: 0.05 } }
 };
 
 const itemVariants = {
-  hidden: { y: 20, opacity: 0 },
+  hidden: { y: 15, opacity: 0 },
   show: { y: 0, opacity: 1, transition: { type: "spring" as const, stiffness: 300, damping: 24 } }
 };
 
 export default function DoctorAppointmentsPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  
   const { data: appointments, isLoading: loadingAppts } = useQuery({
     queryKey: ["appointments"],
     queryFn: getAppointments
@@ -39,6 +38,22 @@ export default function DoctorAppointmentsPage() {
   const { data: patients, isLoading: loadingPatients } = useQuery({
     queryKey: ["patients"],
     queryFn: getPatients
+  });
+
+  const updateStatus = useMutation({
+    mutationFn: async ({ id, status }: { id: string, status: any }) => {
+      const response = await fetch(`/api/v1/appointments/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status })
+      });
+      if (!response.ok) throw new Error("Failed to update status");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast.success("Appointment status updated");
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
+    }
   });
 
   const isLoading = loadingAppts || loadingPatients;
@@ -55,338 +70,279 @@ export default function DoctorAppointmentsPage() {
         const patient = patients?.find(p => p.id === appt.patient_id);
         return (patient?.name?.toLowerCase().includes(lowerQuery)) || 
                (patient?.phone?.includes(lowerQuery)) ||
-               (appt.reason?.toLowerCase().includes(lowerQuery)) ||
-               (appt.patient_id.toLowerCase().includes(lowerQuery)) ||
-               (patient?.id?.toLowerCase().includes(lowerQuery));
+               ((appt as any).reason?.toLowerCase().includes(lowerQuery)) ||
+               ((appt as any).reason_for_visit?.toLowerCase().includes(lowerQuery)) ||
+               (appt.patient_id.toLowerCase().includes(lowerQuery));
       });
     }
 
     if (statusFilter !== "all") {
-      filtered = filtered.filter(appt => appt.status === statusFilter);
+      filtered = filtered.filter(appt => (appt.status as string) === statusFilter);
     }
 
     return filtered.slice().sort((a, b) => {
       const dateA = new Date(`${a.appointment_date}T${a.appointment_time}`);
       const dateB = new Date(`${b.appointment_date}T${b.appointment_time}`);
-      return dateA.getTime() - dateB.getTime();
+      return dateB.getTime() - dateA.getTime(); // Newest first
     });
   }, [appointments, patients, searchQuery, statusFilter]);
 
   const totalAppts = appointments || [];
-  const completedTotal = totalAppts.filter(a => a.status === 'completed').length;
-  const pendingTotal = totalAppts.filter(a => a.status === 'scheduled').length;
-  const nextAppt = totalAppts.filter(a => a.status === 'scheduled')
-    .sort((a, b) => {
-      const dateA = new Date(`${a.appointment_date}T${a.appointment_time}`);
-      const dateB = new Date(`${b.appointment_date}T${b.appointment_time}`);
-      return dateA.getTime() - dateB.getTime();
-    })[0];
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'completed': return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none font-medium">Completed</Badge>;
-      case 'scheduled': return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-none font-medium">Scheduled</Badge>;
-      case 'cancelled': return <Badge className="bg-rose-100 text-rose-700 hover:bg-rose-100 border-none font-medium">Cancelled</Badge>;
-      default: return <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100 border-none font-medium capitalize">{status}</Badge>;
-    }
-  };
+  const completedTotal = totalAppts.filter(a => (a.status as string) === 'completed').length;
+  const pendingTotal = totalAppts.filter(a => (a.status as string) === 'scheduled' || (a.status as string) === 'waiting' || (a.status as string) === 'checked-in').length;
+  const activeAppt = totalAppts.find(a => (a.status as string) === 'in_consultation');
 
   return (
-    <div className="space-y-8 pb-20 md:pb-10 max-w-5xl mx-auto">
-      {/* Header */}
-      <div className="flex justify-end gap-4">
-        <div className="flex gap-3">
-           <Button variant="outline" onClick={() => toast.success("Calendar synced successfully")} className="border-slate-200 shadow-sm hidden sm:flex">
-             <CalendarX className="w-4 h-4 mr-2 text-slate-500" />
-             Sync Calendar
+    <div className="space-y-6 md:space-y-8 pb-20 md:pb-10 max-w-[1400px] mx-auto">
+      {/* Header Section */}
+      <motion.div 
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-card p-6 rounded-[24px] border border-slate-200/60 dark:border-slate-800/60 shadow-sm"
+      >
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+             <CalendarX className="w-8 h-8 text-blue-500 hidden sm:block" /> Appointments
+          </h1>
+          <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm">
+            Manage your consultations and upcoming schedule.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+           <Button onClick={() => router.push('/doctor/settings?tab=availability')} variant="outline" className="h-10 rounded-full font-medium shadow-sm hover:bg-slate-50">
+             <Clock className="w-4 h-4 mr-2 text-indigo-500" /> Manage Schedule
            </Button>
            <BookAppointmentModal trigger={
-             <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm hidden sm:flex">
-               <Plus className="w-4 h-4 mr-2" />
-               Book Appointment
+             <Button className="h-10 rounded-full font-medium shadow-sm bg-blue-600 hover:bg-blue-700 text-white px-5">
+               <Plus className="w-4 h-4 mr-2" /> Book Appt
              </Button>
            } />
         </div>
-      </div>
+      </motion.div>
 
-      {/* Summary KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="border shadow-sm bg-white dark:bg-slate-900">
-          <CardContent className="p-4 md:p-5 flex items-center gap-4">
-             <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
-                <Clock className="w-5 h-5" />
-             </div>
-             <div>
-               <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Total Appts</p>
-               <h4 className="text-xl font-bold text-slate-900 dark:text-white">{totalAppts.length}</h4>
-             </div>
-          </CardContent>
-        </Card>
-        <Card className="border shadow-sm bg-white dark:bg-slate-900">
-          <CardContent className="p-4 md:p-5 flex items-center gap-4">
-             <div className="w-10 h-10 rounded-full bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 dark:text-amber-400">
-                <Loader2 className="w-5 h-5" />
-             </div>
-             <div>
-               <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Pending</p>
-               <h4 className="text-xl font-bold text-slate-900 dark:text-white">{pendingTotal}</h4>
-             </div>
-          </CardContent>
-        </Card>
-        <Card className="border shadow-sm bg-white dark:bg-slate-900">
-          <CardContent className="p-4 md:p-5 flex items-center gap-4">
-             <div className="w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-                <CheckCircle2 className="w-5 h-5" />
-             </div>
-             <div>
-               <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Completed</p>
-               <h4 className="text-xl font-bold text-slate-900 dark:text-white">{completedTotal}</h4>
-             </div>
-          </CardContent>
-        </Card>
-        <Card className="border shadow-sm bg-white dark:bg-slate-900">
-          <CardContent className="p-4 md:p-5 flex items-center gap-4">
-             <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-400">
-                <Navigation className="w-5 h-5" />
-             </div>
-             <div className="overflow-hidden">
-               <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Next Appt</p>
-               <h4 className="text-lg font-bold text-slate-900 dark:text-white truncate">
-                 {nextAppt ? `${new Date(nextAppt.appointment_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} ${nextAppt.appointment_time}` : '--:--'}
-               </h4>
-             </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* KPI Cards */}
+      <motion.div 
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+      >
+        <motion.div variants={itemVariants}>
+          <Card className="rounded-[20px] border-slate-200/60 dark:border-slate-800/60 shadow-sm hover:shadow-md transition-all bg-white dark:bg-slate-950 overflow-hidden relative">
+            <div className="absolute top-0 right-0 p-4 opacity-10">
+              <Clock className="w-16 h-16" />
+            </div>
+            <CardContent className="p-5">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-9 h-9 rounded-full bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-blue-500">
+                  <CalendarX className="w-4 h-4" />
+                </div>
+                <p className="text-sm font-semibold text-slate-500">Total Scheduled</p>
+              </div>
+              <h3 className="text-3xl font-bold text-slate-900 dark:text-white mt-1">
+                {isLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : totalAppts.length}
+              </h3>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-      {/* Search & Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 items-center bg-white dark:bg-slate-900 p-2 rounded-2xl border shadow-sm">
-        <div className="relative flex-1 w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <Input 
-            placeholder="Search patients by name or phone..." 
-            className="pl-9 border-none bg-transparent shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-        <div className="h-8 w-px bg-slate-200 dark:bg-slate-800 hidden sm:block"></div>
-        <div className="flex items-center gap-2 w-full sm:w-auto px-2 pb-2 sm:pb-0">
-          <Filter className="w-4 h-4 text-slate-400 hidden sm:block" />
-          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v || "all")}>
-            <SelectTrigger className="w-full sm:w-[150px] border-none shadow-none bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors rounded-xl">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="scheduled">Scheduled</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+        <motion.div variants={itemVariants}>
+          <Card className="rounded-[20px] border-slate-200/60 dark:border-slate-800/60 shadow-sm hover:shadow-md transition-all bg-white dark:bg-slate-950 overflow-hidden relative">
+             <div className="absolute top-0 right-0 p-4 opacity-10">
+              <Activity className="w-16 h-16" />
+            </div>
+            <CardContent className="p-5">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-9 h-9 rounded-full bg-amber-50 dark:bg-amber-500/10 flex items-center justify-center text-amber-500">
+                  <Loader2 className="w-4 h-4" />
+                </div>
+                <p className="text-sm font-semibold text-slate-500">Waiting / Pending</p>
+              </div>
+              <h3 className="text-3xl font-bold text-slate-900 dark:text-white mt-1">
+                {isLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : pendingTotal}
+              </h3>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-      {/* Timeline */}
-      <div className="relative">
-        {/* Vertical line for desktop */}
-        <div className="hidden md:block absolute left-[88px] top-4 bottom-4 w-px bg-slate-200 dark:bg-slate-800 z-0"></div>
+        <motion.div variants={itemVariants}>
+          <Card className="rounded-[20px] border-slate-200/60 dark:border-slate-800/60 shadow-sm hover:shadow-md transition-all bg-white dark:bg-slate-950 overflow-hidden relative">
+             <div className="absolute top-0 right-0 p-4 opacity-10 text-emerald-500">
+              <CheckCircle2 className="w-16 h-16" />
+            </div>
+            <CardContent className="p-5">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-9 h-9 rounded-full bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                  <CheckCircle2 className="w-4 h-4" />
+                </div>
+                <p className="text-sm font-semibold text-slate-500">Completed</p>
+              </div>
+              <h3 className="text-3xl font-bold text-slate-900 dark:text-white mt-1">
+                {isLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : completedTotal}
+              </h3>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-        {isLoading ? (
-          <div className="py-20 flex flex-col items-center justify-center space-y-4">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-            <p className="text-slate-500 font-medium">Loading appointments...</p>
+        <motion.div variants={itemVariants}>
+          <Card className="rounded-[20px] border-indigo-200 dark:border-indigo-900/50 shadow-sm hover:shadow-md transition-all bg-indigo-50 dark:bg-indigo-950/20 overflow-hidden">
+            <CardContent className="p-5 flex flex-col justify-center h-full">
+               <div className="flex items-center justify-between mb-2">
+                 <p className="text-sm font-semibold text-indigo-900 dark:text-indigo-400">Current Status</p>
+                 <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></div>
+               </div>
+               {activeAppt ? (
+                 <div>
+                    <h3 className="text-xl font-bold text-indigo-900 dark:text-indigo-300 truncate">
+                      {patients?.find(p => p.id === activeAppt.patient_id)?.name || "In Consultation"}
+                    </h3>
+                    <p className="text-xs text-indigo-700/70 mt-1 font-medium">{activeAppt.appointment_time}</p>
+                 </div>
+               ) : (
+                 <div className="text-indigo-700/70 font-medium mt-1">No active consultation.</div>
+               )}
+            </CardContent>
+          </Card>
+        </motion.div>
+      </motion.div>
+
+      {/* Main Table Card */}
+      <Card className="border-slate-200/60 dark:border-slate-800/60 shadow-sm rounded-[24px] overflow-hidden bg-white dark:bg-slate-950">
+        <div className="p-4 sm:p-6 border-b border-slate-100 dark:border-slate-800/50 bg-slate-50/50 dark:bg-slate-900/50 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+          <div className="relative w-full sm:w-80">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Input 
+              placeholder="Search by patient name, phone..." 
+              className="pl-9 h-11 rounded-full bg-white dark:bg-slate-900 border-slate-200 shadow-sm"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
           </div>
-        ) : sortedAppointments.length === 0 ? (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="py-16 px-6 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl bg-slate-50 dark:bg-slate-900/50 mt-4"
-          >
-            <div className="w-20 h-20 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-slate-100 dark:border-slate-700">
-               <CalendarX className="w-10 h-10 text-slate-400" />
+          
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
+              <Filter className="w-4 h-4" /> Filter:
             </div>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">No appointments found</h3>
-            <p className="text-slate-500 max-w-sm mx-auto mb-8">
-              {searchQuery || statusFilter !== 'all' 
-                ? "We couldn't find any appointments matching your filters. Try adjusting your search criteria."
-                : "Enjoy your free schedule or create a new appointment."}
-            </p>
-            <div className="flex items-center justify-center gap-4 flex-col sm:flex-row">
-               <BookAppointmentModal trigger={
-                 <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm rounded-full px-6 w-full sm:w-auto">
-                   <Plus className="w-4 h-4 mr-2" />
-                   Book Appointment
-                 </Button>
-               } />
-               <Button variant="outline" onClick={() => toast.success("Calendar synced successfully")} className="rounded-full px-6 border-slate-200 shadow-sm w-full sm:w-auto">
-                 Sync Calendar
-               </Button>
+            <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val || "all")}>
+              <SelectTrigger className="w-[150px] h-11 rounded-full bg-white dark:bg-slate-900 shadow-sm font-medium">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Appointments</SelectItem>
+                <SelectItem value="scheduled">Scheduled</SelectItem>
+                <SelectItem value="checked-in">Checked In</SelectItem>
+                <SelectItem value="waiting">Waiting</SelectItem>
+                <SelectItem value="in_consultation">In Consultation</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto min-h-[400px]">
+          {isLoading ? (
+            <div className="py-24 flex flex-col items-center justify-center">
+              <Loader2 className="w-10 h-10 animate-spin text-blue-500 mb-4" />
+              <p className="text-slate-500 font-medium">Loading appointments...</p>
             </div>
-          </motion.div>
-        ) : (
-          <motion.div 
-            variants={containerVariants}
-            initial="hidden"
-            animate="show"
-            className="space-y-6 pt-4"
-          >
-            <AnimatePresence>
-              {sortedAppointments.map((appt) => {
-                const patient = patients?.find(p => p.id === appt.patient_id);
-                const isPast = new Date(`${appt.appointment_date}T${appt.appointment_time}`).getTime() < new Date().getTime();
-                const isToday = new Date(appt.appointment_date).toDateString() === new Date().toDateString();
-
-                return (
-                  <motion.div 
-                    key={appt.id} 
-                    variants={itemVariants}
-                    layout
-                    className="flex flex-col md:flex-row relative z-10"
-                  >
-                    {/* Time Column (Desktop) */}
-                    <div className="hidden md:flex flex-col items-end pr-8 pt-6 w-32 shrink-0">
-                      <span className={`text-sm font-bold ${isPast && appt.status !== 'completed' ? 'text-rose-500' : 'text-slate-900 dark:text-white'}`}>
-                        {appt.appointment_time}
-                      </span>
-                      <span className="text-xs text-slate-500 mt-1">
-                        {isToday ? 'Today' : new Date(appt.appointment_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                      </span>
-                    </div>
-
-                    {/* Timeline Dot (Desktop) */}
-                    <div className="hidden md:flex flex-col items-center pt-6 pr-8">
-                      <div className={`w-3 h-3 rounded-full ring-4 ring-slate-50 dark:ring-slate-950 z-10 ${
-                        appt.status === 'completed' ? 'bg-emerald-500' : 
-                        appt.status === 'scheduled' ? 'bg-blue-500' : 'bg-slate-300'
-                      }`} />
-                    </div>
-
-                    {/* Card */}
-                    <Card className="flex-1 border-slate-200/60 dark:border-slate-800 shadow-sm hover:shadow-md transition-all bg-white dark:bg-slate-900 overflow-hidden group rounded-[20px] flex flex-col hover:border-blue-300 dark:hover:border-blue-700">
-                      <CardContent className="p-0 flex-1 flex flex-col">
-                        
-                        {/* Top Profile Section */}
-                        <div className="p-4 sm:p-5 flex gap-4">
-                          <Avatar className="w-12 h-12 sm:w-14 sm:h-14 border shadow-sm shrink-0">
-                            <AvatarFallback className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-sm sm:text-base">
-                              {patient ? patient.name.substring(0, 2).toUpperCase() : 'PT'}
+          ) : sortedAppointments.length === 0 ? (
+            <div className="py-24 flex flex-col items-center justify-center text-center px-4">
+              <div className="w-20 h-20 bg-slate-50 dark:bg-slate-900 rounded-full flex items-center justify-center mb-4">
+                <CalendarX className="w-10 h-10 text-slate-300" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white">No Appointments Found</h3>
+              <p className="text-slate-500 mt-2 max-w-sm">No scheduled consultations match your current search criteria.</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader className="bg-slate-50/50 dark:bg-slate-900/50">
+                <TableRow className="border-b border-slate-200 dark:border-slate-800 hover:bg-transparent">
+                  <TableHead className="w-[300px] font-semibold text-slate-600 pl-6 h-12">Patient Information</TableHead>
+                  <TableHead className="font-semibold text-slate-600 h-12">Time Slot</TableHead>
+                  <TableHead className="font-semibold text-slate-600 h-12">Reason</TableHead>
+                  <TableHead className="font-semibold text-slate-600 h-12">Status</TableHead>
+                  <TableHead className="text-right font-semibold text-slate-600 pr-6 h-12">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sortedAppointments.map((appt) => {
+                  const patient = patients?.find(p => p.id === appt.patient_id);
+                  const isConsulting = (appt.status as string) === 'in_consultation';
+                  
+                  return (
+                    <TableRow key={appt.id} className={`border-b border-slate-100 dark:border-slate-800/50 transition-colors ${isConsulting ? 'bg-blue-50/50 dark:bg-blue-900/10' : 'hover:bg-slate-50/50 dark:hover:bg-slate-900/50'}`}>
+                      <TableCell className="pl-6">
+                        <div className="flex items-center gap-3">
+                          <Avatar className={`h-11 w-11 border-2 ${isConsulting ? 'border-blue-500' : 'border-white dark:border-slate-800'} shadow-sm`}>
+                            <AvatarFallback className="bg-blue-50 text-blue-700 font-bold">
+                              {patient?.name?.substring(0, 2).toUpperCase() || 'PT'}
                             </AvatarFallback>
                           </Avatar>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex justify-between items-start">
-                              <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white truncate pr-2">
-                                {patient ? patient.name : "Unnamed Patient"}
-                              </h3>
-                              <div className="shrink-0 scale-90 origin-top-right">
-                                {getStatusBadge(appt.status)}
-                              </div>
-                            </div>
-                            
-                            <div className="flex flex-wrap items-center gap-1.5 mt-1 text-xs text-slate-500">
-                               <span>{appt.patient_id.substring(0, 8)}</span>
-                               {patient?.age && (
-                                 <>
-                                   <span className="w-1 h-1 rounded-full bg-slate-300"></span>
-                                   <span>{patient.age} yrs</span>
-                                 </>
-                               )}
-                               {patient?.gender && (
-                                 <>
-                                   <span className="w-1 h-1 rounded-full bg-slate-300"></span>
-                                   <span className="capitalize">{patient.gender}</span>
-                                 </>
-                               )}
-                            </div>
-                            
-                            {patient?.phone && (
-                                <div className="flex items-center gap-1.5 mt-2 text-xs font-medium text-slate-600 dark:text-slate-400">
-                                  <Phone className="w-3 h-3 text-slate-400" />
-                                  {patient.phone}
-                                </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Medical Context & Time */}
-                        <div className="px-4 sm:px-5 pb-3">
-                           <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 border border-slate-100 dark:border-slate-800/80">
-                             <div className="grid grid-cols-2 gap-3 text-xs">
-                               <div>
-                                 <p className="text-slate-400 mb-0.5 text-[10px] uppercase font-bold tracking-wider">Time & Date</p>
-                                 <p className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                                    <Clock className="w-3.5 h-3.5 text-blue-500" /> {appt.appointment_time}
-                                 </p>
-                                 <p className="text-[10px] text-slate-500 mt-0.5">
-                                    {isToday ? 'Today' : new Date(appt.appointment_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                                 </p>
-                               </div>
-                               <div>
-                                 <p className="text-slate-400 mb-0.5 text-[10px] uppercase font-bold tracking-wider">Reason</p>
-                                 <p className="font-semibold text-slate-700 dark:text-slate-300 truncate">
-                                   {appt.reason || 'Consultation'}
-                                 </p>
-                                 <p className="text-[10px] text-slate-500 truncate mt-0.5 flex items-center gap-1">
-                                    <Stethoscope className="w-3 h-3 text-emerald-500"/> Checkup
-                                 </p>
-                               </div>
-                             </div>
-                           </div>
-                        </div>
-
-                        <div className="mt-auto"></div>
-
-                        {/* Quick Actions Footer */}
-                        <div className="border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 p-2 sm:p-3 flex items-center justify-between">
-                          <div className="flex items-center gap-1">
-                            <UploadPrescriptionModal 
-                                appointmentId={appt.id} 
-                                patientId={appt.patient_id} 
-                                doctorId={appt.doctor_id} 
-                                existingPrescriptionId={appt.prescription_id || undefined}
-                                trigger={
-                                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800" title="Upload Prescription">
-                                    <Pill className="w-4 h-4" />
-                                  </Button>
-                                }
-                            />
-                            <Button variant="ghost" size="icon" onClick={() => toast.info(appt.notes ? `Note: ${appt.notes}` : "No notes available")} className="h-8 w-8 rounded-full text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800" title="View Notes">
-                                <FileText className="w-4 h-4" />
-                            </Button>
-                          </div>
-                          
                           <div>
-                            <Button 
-                              size="sm" 
-                              onClick={() => router.push(`/doctor/patients/${appt.patient_id}`)}
-                              className={`h-8 rounded-full px-5 shadow-sm text-xs font-bold tracking-wide uppercase ${
-                               appt.status === 'completed' 
-                                ? 'bg-slate-200 text-slate-600 hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700' 
-                                : 'bg-blue-600 text-white hover:bg-blue-700'
-                             }`}>
-                               {appt.status === 'completed' ? 'View Details' : 'Start Consult'}
-                            </Button>
+                            <div className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                              {patient ? patient.name : "Unnamed Patient"}
+                            </div>
+                            <div className="text-xs text-slate-500 mt-0.5 flex flex-wrap items-center gap-2">
+                              {patient?.phone && <span className="flex items-center gap-1 font-medium"><Phone className="w-3 h-3" /> {patient.phone}</span>}
+                              <span>• ID: {patient?.id?.substring(0,6) || appt.patient_id.substring(0,6)}</span>
+                            </div>
                           </div>
                         </div>
-
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                );
-              })}
-            </AnimatePresence>
-          </motion.div>
-        )}
-      </div>
-
-      {/* Mobile FAB */}
-      <BookAppointmentModal trigger={
-        <Button 
-          className="fixed bottom-6 right-6 md:hidden w-14 h-14 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-[0_8px_30px_rgb(59,130,246,0.3)] z-50 flex items-center justify-center p-0"
-        >
-          <Plus className="w-6 h-6" />
-        </Button>
-      } />
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-semibold text-slate-900 dark:text-slate-100 text-sm">
+                           {appt.appointment_time}
+                        </div>
+                        <div className="text-xs text-slate-500 mt-0.5 font-medium">
+                           {new Date(appt.appointment_date).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                         <div className="text-sm font-medium text-slate-700 dark:text-slate-300 max-w-[200px] truncate">
+                            {(appt as any).reason_for_visit || (appt as any).reason || 'Consultation'}
+                         </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={
+                          (appt.status as string) === 'completed' ? 'success' : 
+                          (appt.status as string) === 'cancelled' ? 'destructive' : 
+                          (appt.status as string) === 'waiting' || (appt.status as string) === 'checked-in' ? 'secondary' : 
+                          (appt.status as string) === 'in_consultation' ? 'default' : 'default'
+                        } className={`capitalize px-3 py-1 text-xs font-semibold rounded-full ${(appt.status as string) === 'in_consultation' ? 'bg-blue-500' : ''}`}>
+                          {appt.status.replace('_', ' ')}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right pr-6">
+                        <div className="flex justify-end gap-2 items-center">
+                          {(appt.status as string) === 'waiting' && (
+                            <Button size="sm" onClick={() => updateStatus.mutate({ id: appt.id, status: 'in_consultation' })} className="h-8 rounded-full text-xs font-medium px-4 shadow-sm bg-blue-600 hover:bg-blue-700 text-white">
+                              Start Consult
+                            </Button>
+                          )}
+                          {(appt.status as string) === 'in_consultation' && (
+                            <Button size="sm" onClick={() => updateStatus.mutate({ id: appt.id, status: 'completed' })} className="h-8 rounded-full text-xs font-medium px-4 shadow-sm bg-emerald-600 hover:bg-emerald-700 text-white">
+                              Finish
+                            </Button>
+                          )}
+                          {(appt.status as string) === 'scheduled' && (
+                             <Button size="sm" onClick={() => updateStatus.mutate({ id: appt.id, status: 'cancelled' })} variant="outline" className="h-8 rounded-full text-xs font-medium px-3 text-rose-500 hover:text-rose-600 hover:bg-rose-50 border-rose-200">
+                               <X className="w-3.5 h-3.5" />
+                             </Button>
+                          )}
+                          <Button variant="ghost" size="sm" onClick={() => router.push(`/doctor/patients/${appt.patient_id}`)} className="h-8 w-8 p-0 rounded-full text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors">
+                            <ChevronRight className="w-5 h-5" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </div>
+      </Card>
     </div>
   );
 }
