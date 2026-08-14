@@ -198,6 +198,60 @@ def handle_flow_data_exchange(decrypted_body: Dict[str, Any], tenant_id: str) ->
 
     flow_type = state.get("f", "appointment")
 
+    # ── UNAVAILABILITY FLOW ───────────────────────────────────────────────────
+    if flow_type == "unavailable":
+        if action in ("INIT", "init") or (not trigger and screen in ("", "UNAVAILABLE_FORM", None)):
+            return {
+                "version": version,
+                "screen": "UNAVAILABLE_FORM",
+                "data": {}
+            }
+            
+        if trigger == "submit_unavailable":
+            # We insert directly to DB here
+            date_str = payload.get("date", "")
+            start_time_str = payload.get("start_time", "")
+            duration_hrs_str = payload.get("duration", "1")
+            reason = payload.get("reason", "")
+            
+            doctor_id = state.get("did", "")
+            
+            if doctor_id and date_str and start_time_str:
+                from datetime import datetime, timedelta
+                try:
+                    start_dt = datetime.strptime(f"{date_str} {start_time_str}", "%Y-%m-%d %H:%M")
+                    duration_hrs = int(duration_hrs_str)
+                    end_dt = start_dt + timedelta(hours=duration_hrs)
+                    
+                    # Insert into doctor_holidays
+                    from app.db.supabase import db
+                    import uuid
+                    db.table("doctor_holidays").insert({
+                        "id": str(uuid.uuid4()),
+                        "tenant_id": tenant_id,
+                        "doctor_id": doctor_id,
+                        "date": date_str,
+                        "holiday_type": "time_off",
+                        "start_time": start_time_str,
+                        "end_time": end_dt.strftime("%H:%M"),
+                        "reason": reason
+                    }).execute()
+                except Exception as e:
+                    logger.error(f"Failed to save unavailability: {e}")
+
+            return {
+                "version": version,
+                "screen": "SUCCESS",
+                "data": {
+                    "extension_message_response": {
+                        "params": {
+                            "flow_token": flow_token,
+                            "status": "unavailable_confirmed"
+                        }
+                    }
+                }
+            }
+
     # ── REGISTRATION FLOW ─────────────────────────────────────────────────────
     if flow_type == "register":
         if action in ("INIT", "init") or (not trigger and screen in ("", "PATIENT_REGISTRATION", None)):

@@ -418,6 +418,17 @@ class DoctorAgent:
                 reply_id = inter.get("button_reply", {}).get("id", "")
                 self._handle_list_reply(from_number, session, doctor, reply_id)
                 return
+            elif inter_type == "nfm_reply":
+                import json
+                response_json = inter.get("nfm_reply", {}).get("response_json", "{}")
+                try:
+                    resp_data = json.loads(response_json)
+                    status = resp_data.get("status")
+                    if status == "unavailable_confirmed":
+                        self.sender.send_message(from_number, "✅ Schedule updated! Your unavailability has been marked in the system.")
+                except Exception as e:
+                    logger.error(f"[nfm_reply] parse error in doctor_agent: {e}")
+                return
 
         # ── Text messages ────────────────────────────────────────
         if msg_type == "text":
@@ -456,15 +467,7 @@ class DoctorAgent:
                 _back_to_menu_payload("🔍 *Search Patient*\n\nType the patient's *name* or *mobile number* to search:"))
 
         elif reply_id == "MARK_UNAVAILABLE":
-            session["flow"] = "MARK_LEAVE"
-            self.sender.send_interactive_message(from_number, _button_payload(
-                "🗓️ *Mark Leave / Unavailable*\n\nWhen will you be unavailable?",
-                [
-                    {"id": "LEAVE_TODAY", "title": "Today"},
-                    {"id": "LEAVE_TOMORROW", "title": "Tomorrow"},
-                    {"id": "ACTION_BACK", "title": "⬅️ Back"}
-                ]
-            ))
+            self._send_unavailable_flow_cta(from_number, phone_number_id, doctor.get("id"))
 
         elif reply_id == "ACTION_LABS":
             self._show_labs(from_number, session, doctor)
@@ -711,6 +714,57 @@ class DoctorAgent:
             _patient_action_payload(patient.get("name", "Patient")))
 
     # ── Labs ─────────────────────────────────────────────────────
+
+    def _send_unavailable_flow_cta(self, to_number: str, phone_number_id: str, doctor_id: str):
+        import os, json, base64
+        flow_id = os.environ.get("WHATSAPP_UNAVAILABLE_FLOW_ID", "")
+        if not flow_id:
+            self.sender.send_message(to_number, "⚠️ Unavailable Flow is not configured.", phone_number_id)
+            return
+
+        state = {"p": to_number, "did": doctor_id, "f": "unavailable"}
+        encoded_state = base64.urlsafe_b64encode(json.dumps(state).encode()).decode().rstrip("=")
+        flow_token = f"tk_{encoded_state}"
+
+        payload = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": to_number,
+            "type": "interactive",
+            "interactive": {
+                "type": "flow",
+                "header": {
+                    "type": "text",
+                    "text": "🗓️ Mark Unavailable"
+                },
+                "body": {
+                    "text": "Select the date, time, and duration of your unavailability."
+                },
+                "footer": {
+                    "text": "Update Schedule"
+                },
+                "action": {
+                    "name": "flow",
+                    "parameters": {
+                        "flow_message_version": "3",
+                        "flow_token": flow_token,
+                        "flow_id": flow_id,
+                        "flow_cta": "Open Form",
+                        "mode": os.environ.get("WHATSAPP_FLOW_MODE", "published"),
+                        "flow_action": "data_exchange"
+                    }
+                }
+            }
+        }
+        
+        from app.core.config import settings
+        import requests
+        url = f"https://graph.facebook.com/v21.0/{phone_number_id}/messages"
+        try:
+            requests.post(url, headers={"Authorization": f"Bearer {settings.WHATSAPP_TOKEN}", "Content-Type": "application/json"}, json=payload, timeout=10)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Failed to send unavailable flow cta: {e}")
 
     def _show_labs(self, from_number: str, session: dict, doctor):
         patient_id = session.get("selected_patient_id")

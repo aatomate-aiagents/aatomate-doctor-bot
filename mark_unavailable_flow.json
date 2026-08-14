@@ -1,0 +1,81 @@
+{
+    "version": "3.0",
+    "data_api_version": "3.0",
+    "routing_model": {
+        "UNAVAILABLE_FORM": []
+    },
+    "screens": [
+        {
+            "id": "UNAVAILABLE_FORM",
+            "title": "Mark Unavailable",
+            "terminal": true,
+            "data": {},
+            "layout": {
+                "type": "SingleColumnLayout",
+                "children": [
+                    {
+                        "type": "Form",
+                        "name": "unavailable_form",
+                        "children": [
+                            {
+                                "type": "DatePicker",
+                                "label": "Date of Leave / Unavailability",
+                                "name": "date",
+                                "required": true
+                            },
+                            {
+                                "type": "Dropdown",
+                                "label": "Start Time",
+                                "name": "start_time",
+                                "required": true,
+                                "data-source": [
+                                    {"id": "09:00", "title": "09:00 AM"},
+                                    {"id": "10:00", "title": "10:00 AM"},
+                                    {"id": "11:00", "title": "11:00 AM"},
+                                    {"id": "12:00", "title": "12:00 PM"},
+                                    {"id": "13:00", "title": "01:00 PM"},
+                                    {"id": "14:00", "title": "02:00 PM"},
+                                    {"id": "15:00", "title": "03:00 PM"},
+                                    {"id": "16:00", "title": "04:00 PM"},
+                                    {"id": "17:00", "title": "05:00 PM"}
+                                ]
+                            },
+                            {
+                                "type": "Dropdown",
+                                "label": "Duration",
+                                "name": "duration",
+                                "required": true,
+                                "data-source": [
+                                    {"id": "1", "title": "1 Hour"},
+                                    {"id": "2", "title": "2 Hours"},
+                                    {"id": "4", "title": "Half Day (4 Hours)"},
+                                    {"id": "8", "title": "Full Day (8 Hours)"}
+                                ]
+                            },
+                            {
+                                "type": "TextInput",
+                                "label": "Reason (Optional)",
+                                "name": "reason",
+                                "required": false
+                            },
+                            {
+                                "type": "Footer",
+                                "label": "Submit",
+                                "on-click-action": {
+                                    "name": "data_exchange",
+                                    "payload": {
+                                        "trigger": "submit_unavailable",
+                                        "date": "${form.date}",
+                                        "start_time": "${form.start_time}",
+                                        "duration": "${form.duration}",
+                                        "reason": "${form.reason}"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

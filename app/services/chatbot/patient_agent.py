@@ -1257,7 +1257,6 @@ class PatientAgent:
         
         # We need to re-trigger the flow but pass 'appt_id' as 'rid'
         from app.db.supabase import db
-        import uuid
         try:
             res = db.table("appointments").select("patients(name)").eq("id", appt_id).execute()
             patient_name = res.data[0].get("patients", {}).get("name", "Patient") if res.data else "Patient"
