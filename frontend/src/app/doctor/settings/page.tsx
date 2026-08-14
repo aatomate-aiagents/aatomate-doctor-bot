@@ -41,15 +41,17 @@ export default function DoctorSettingsPage() {
       setName(userProfile?.name || "");
       setPhone("");
       
-      // Fetch doctor specific data
+      // Fetch doctor specific data — doctors table has no user_id column
+      // Match by user name instead
+      const userName = userProfile?.name || "";
       const { data: docData, error } = await supabase
         .from('doctors')
         .select('*')
-        .eq('user_id', userProfile?.uid)
-        .single();
+        .eq('name', userName)
+        .maybeSingle();
         
       if (docData && !error) {
-        setSpecialty(docData.specialty || "");
+        setSpecialty(docData.specialization || docData.specialty || "");
         setFee(docData.consultation_fee?.toString() || "");
       }
     } catch (error) {
@@ -70,14 +72,17 @@ export default function DoctorSettingsPage() {
         
       if (userError) throw userError;
 
-      // Update doctors table
+      // Update doctors table — no user_id column, match by current name + tenant
+      const oldName = userProfile?.name || name;
       const { error: docError } = await supabase
         .from('doctors')
         .update({ 
-          specialty, 
+          name,
+          specialization: specialty, 
           consultation_fee: fee ? parseInt(fee) : 0 
         })
-        .eq('user_id', userProfile?.uid);
+        .eq('name', oldName)
+        .eq('tenant_id', userProfile?.tenantId);
         
       if (docError) throw docError;
 

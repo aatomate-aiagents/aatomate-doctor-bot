@@ -57,6 +57,7 @@ const getNavigationByRole = (role: Role): SidebarItem[] => {
         { name: "My Dashboard", href: "/doctor", icon: LayoutDashboard },
         { name: "Appointments", href: "/doctor/appointments", icon: Calendar },
         { name: "Patients", href: "/doctor/patients", icon: Users },
+        { name: "Settings", href: "/doctor/settings", icon: Settings },
       ];
     case Role.STAFF:
     case Role.RECEPTIONIST:

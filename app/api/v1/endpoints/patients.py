@@ -35,19 +35,34 @@ def get_all_patients(current_user: CurrentUser = Depends(get_current_user)):
     List all patients for a tenant. If user is a doctor, restrict to their patients.
     """
     if current_user.active_role == "doctor":
-        # Find doctor_id for this user
         from app.db.supabase import db
-        doc_res = db.table("doctors").select("id").eq("user_id", current_user.uid).execute()
-        if doc_res.data:
-            doctor_id = doc_res.data[0]["id"]
+        # The doctors table has no user_id column.
+        # Look up the user's name first, then match to doctors by name + tenant.
+        user_res = db.table("users").select("name").eq("id", current_user.uid).execute()
+        doctor_name = user_res.data[0]["name"] if user_res.data else None
+
+        doctor_id = None
+        if doctor_name:
+            doc_res = db.table("doctors").select("id").eq("name", doctor_name).eq("tenant_id", current_user.tenant_id).execute()
+            if doc_res.data:
+                doctor_id = doc_res.data[0]["id"]
+
+        if doctor_id:
             # Fetch patients mapped to this doctor via appointments
             res = db.table("patients").select("*, appointments!inner(doctor_id)").eq("tenant_id", current_user.tenant_id).eq("appointments.doctor_id", doctor_id).execute()
             if res.data:
-                # Remove nested appointments array
+                # Remove nested appointments array and deduplicate
+                seen = set()
+                unique = []
                 for row in res.data:
                     if "appointments" in row:
                         del row["appointments"]
-                return res.data
+                    if row["id"] not in seen:
+                        seen.add(row["id"])
+                        unique.append(row)
+                return unique
             return []
-            
+        return []
+
     return PatientService.get_all_patients(current_user.tenant_id)
+
