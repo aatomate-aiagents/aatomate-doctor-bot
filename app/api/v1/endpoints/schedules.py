@@ -36,7 +36,7 @@ def create_holiday(holiday_in: DoctorHolidayCreate, current_user: CurrentUser = 
     """
     if holiday_in.tenant_id != current_user.tenant_id:
         raise HTTPException(status_code=403, detail="Tenant mismatch")
-    return ScheduleService.create_holiday(holiday_in)
+    return ScheduleService.create_holiday(current_user.tenant_id, holiday_in)
 
 @router.get("/{doctor_id}/slots", response_model=List[AppointmentSlotBase])
 def get_available_slots(
