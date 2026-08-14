@@ -109,97 +109,27 @@ def _get_available_dates(doctor_id: str, tenant_id: str, days_ahead: int = 14) -
 def _get_available_slots(doctor_id: str, tenant_id: str, date_str: str) -> List[Dict]:
     """Return available time slots for a doctor on a given date."""
     try:
-        target = date.fromisoformat(date_str)
-        day_of_week = target.weekday()
+        from app.services.schedule_service import ScheduleService
+        from datetime import date, datetime
 
-        # Get schedule for that day
-        sched_res = with_retry(
-            lambda: db.table("doctor_schedules")
-            .select("start_time,end_time,slot_duration_minutes,break_start,break_end")
-            .eq("doctor_id", doctor_id)
-            .eq("tenant_id", tenant_id)
-            .eq("day_of_week", day_of_week)
-            .execute()
-        )()
+        target_date = date.fromisoformat(date_str)
+        slots = ScheduleService.get_available_slots(tenant_id, doctor_id, target_date)
 
-        sched = None
-        if sched_res.data:
-            sched = sched_res.data[0]
+        result = []
+        now = datetime.now()
+        is_today = date_str == now.strftime("%Y-%m-%d")
 
-        # ── Fallback: use doctor.availability_schedule JSON field ──
-        if not sched:
-            DAY_NAMES = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
-            day_name = DAY_NAMES[day_of_week]
-            try:
-                doc_res = with_retry(
-                    lambda: db.table("doctors")
-                    .select("availability_schedule")
-                    .eq("id", doctor_id)
-                    .execute()
-                )()
-                doc = doc_res.data[0] if doc_res.data else None
-                avail = doc.get("availability_schedule", {}) if doc else {}
-                ranges = avail.get(day_name, [])
-                if not ranges:
-                    return []
-                # Parse "09:00-17:00" style ranges into a pseudo schedule
-                first_range = ranges[0]
-                start_str, end_str = first_range.split("-")
-                slot_duration = avail.get("_slot_duration", 30)
-                sched = {
-                    "start_time": start_str.strip(),
-                    "end_time": end_str.strip(),
-                    "slot_duration_minutes": int(slot_duration),
-                    "break_start": None,
-                    "break_end": None,
-                }
-            except Exception as e:
-                logger.error(f"[flow_handler] availability_schedule fallback error: {e}")
-                return []
+        for s in slots:
+            t_obj = datetime.strptime(s.start_time, "%H:%M")
+            time_str = s.start_time
 
-        if not sched:
-            return []
-
-        # Get already-booked slots
-        booked_res = with_retry(
-            lambda: db.table("appointments")
-            .select("appointment_time")
-            .eq("doctor_id", doctor_id)
-            .eq("tenant_id", tenant_id)
-            .eq("appointment_date", date_str)
-            .in_("status", ["scheduled", "confirmed", "waiting", "checked-in", "in consultation", "completed"])
-            .execute()
-        )()
-        booked_times = {r["appointment_time"][:5] for r in (booked_res.data or [])}
-
-        # Generate slots
-        from datetime import datetime, time as dtime
-        slot_dur = sched.get("slot_duration_minutes", 30)
-        start = datetime.strptime(sched["start_time"][:5], "%H:%M")
-        end   = datetime.strptime(sched["end_time"][:5],   "%H:%M")
-
-        break_start = break_end = None
-        if sched.get("break_start") and sched.get("break_end"):
-            break_start = datetime.strptime(sched["break_start"][:5], "%H:%M")
-            break_end   = datetime.strptime(sched["break_end"][:5],   "%H:%M")
-
-        slots = []
-        cur = start
-        while cur < end:
-            time_str = cur.strftime("%H:%M")
-            # Skip break
-            in_break = break_start and break_end and break_start <= cur < break_end
+            # Filter out past times if target_date is today
+            if is_today and t_obj.time() <= now.time():
+                continue
             
-            is_past = False
-            if date_str == datetime.now().strftime("%Y-%m-%d"):
-                if cur.time() <= datetime.now().time():
-                    is_past = True
-                    
-            if not in_break and not is_past and time_str not in booked_times:
-                slots.append({"id": time_str, "title": cur.strftime("%I:%M %p")})
-            from datetime import timedelta as td
-            cur += td(minutes=slot_dur)
-        return slots[:20]  # cap at 20
+            result.append({"id": time_str, "title": t_obj.strftime("%I:%M %p")})
+        
+        return result[:20]  # cap at 20
 
     except Exception as e:
         logger.error(f"[flow_handler] _get_available_slots error: {e}")

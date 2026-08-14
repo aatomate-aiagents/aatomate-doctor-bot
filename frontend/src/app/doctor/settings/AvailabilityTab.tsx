@@ -91,6 +91,7 @@ export function AvailabilityTab({ userProfile }: { userProfile: any }) {
   const [slotDuration, setSlotDuration] = useState("30");
   const [timezone, setTimezone] = useState("Asia/Kolkata");
 
+  const [doctorId, setDoctorId] = useState<string | null>(null);
   const [schedule, setSchedule] = useState(
     DAY_LABELS.map((day, i) => ({
       day,
@@ -101,7 +102,9 @@ export function AvailabilityTab({ userProfile }: { userProfile: any }) {
     }))
   );
 
-  const [overrides, setOverrides] = useState<{ id: string; date: string; reason: string }[]>([]);
+  const [overrides, setOverrides] = useState<
+    { id: string; date: string; reason: string; start_time?: string; end_time?: string }[]
+  >([]);
 
   // Load existing schedule from doctors.availability_schedule
   useEffect(() => {
@@ -116,17 +119,30 @@ export function AvailabilityTab({ userProfile }: { userProfile: any }) {
 
       const { data: docData } = await supabase
         .from("doctors")
-        .select("availability_schedule")
+        .select("id, availability_schedule")
         .eq("name", userName)
         .eq("tenant_id", userProfile?.tenantId)
         .maybeSingle();
 
       if (docData?.availability_schedule) {
+        setDoctorId(docData.id);
         const avail = docData.availability_schedule;
         // Parse timezone and slot duration from the schedule if stored
         if (avail._timezone) setTimezone(avail._timezone);
         if (avail._slot_duration) setSlotDuration(String(avail._slot_duration));
-        if (avail._overrides) setOverrides(avail._overrides);
+
+        // Load holidays from relational table
+        const { data: holidayData } = await supabase
+          .from("doctor_holidays")
+          .select("id, date, reason, start_time, end_time")
+          .eq("doctor_id", docData.id)
+          .eq("tenant_id", userProfile?.tenantId);
+
+        if (holidayData) {
+          setOverrides(holidayData);
+        } else if (avail._overrides) {
+          setOverrides(avail._overrides);
+        }
 
         // Parse day schedule
         setSchedule(
@@ -184,7 +200,6 @@ export function AvailabilityTab({ userProfile }: { userProfile: any }) {
       const availabilitySchedule: Record<string, any> = {
         _timezone: timezone,
         _slot_duration: parseInt(slotDuration),
-        _overrides: overrides,
       };
 
       for (const day of schedule) {
@@ -202,6 +217,40 @@ export function AvailabilityTab({ userProfile }: { userProfile: any }) {
         .eq("tenant_id", userProfile?.tenantId);
 
       if (error) throw error;
+
+      if (doctorId) {
+        const { data: existing } = await supabase
+          .from("doctor_holidays")
+          .select("id")
+          .eq("doctor_id", doctorId);
+          
+        const currentIds = overrides.map((o) => o.id);
+        const toDelete = existing?.map((e) => e.id).filter((id) => !currentIds.includes(id)) || [];
+        
+        if (toDelete.length > 0) {
+          await supabase.from("doctor_holidays").delete().in("id", toDelete);
+        }
+
+        const toUpsert = overrides.map((o) => {
+          const isUUID = o.id.includes("-") && o.id.length > 20;
+          return {
+            id: isUUID ? o.id : undefined,
+            doctor_id: doctorId,
+            tenant_id: userProfile?.tenantId,
+            date: o.date,
+            reason: o.reason,
+            start_time: o.start_time || null,
+            end_time: o.end_time || null,
+            holiday_type: "time_off",
+          };
+        });
+
+        if (toUpsert.length > 0) {
+          const { error: upsertErr } = await supabase.from("doctor_holidays").upsert(toUpsert);
+          if (upsertErr) console.error("Failed to sync holidays", upsertErr);
+        }
+      }
+
       toast.success("Schedule & Availability saved successfully!");
     } catch (err: any) {
       console.error(err);
@@ -371,6 +420,11 @@ export function AvailabilityTab({ userProfile }: { userProfile: any }) {
                     onChange={(e) => updateOverride(override.id, "reason", e.target.value)}
                     className="flex-1"
                   />
+                  {override.start_time && override.end_time && (
+                    <div className="text-xs text-rose-500 font-medium whitespace-nowrap bg-rose-50 px-2 py-1 rounded">
+                      {override.start_time} - {override.end_time}
+                    </div>
+                  )}
                   <Button
                     variant="ghost"
                     size="icon"

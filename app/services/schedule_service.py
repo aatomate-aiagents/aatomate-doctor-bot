@@ -131,6 +131,13 @@ class ScheduleService:
         ranges = doctor.availability_schedule.get(day_name, [])
         if not ranges:
             return []
+            
+        slot_dur = doctor.availability_schedule.get("_slot_duration")
+        if slot_dur:
+            try:
+                slot_minutes = int(slot_dur)
+            except Exception:
+                pass
 
         slots: List[AppointmentSlotBase] = []
         slot_td   = timedelta(minutes=slot_minutes)
