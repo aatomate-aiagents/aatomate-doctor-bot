@@ -12,6 +12,7 @@ class SlotStatus(str, Enum):
 class HolidayType(str, Enum):
     FULL_DAY = "full_day"
     PARTIAL_DAY = "partial_day"
+    TIME_OFF = "time_off"
 
 class DoctorScheduleBase(BaseModel):
     doctor_id: str
@@ -46,7 +47,7 @@ class DoctorHolidayBase(BaseModel):
     tenant_id: str
     date: date
     reason: str
-    type: HolidayType = HolidayType.FULL_DAY
+    holiday_type: HolidayType = HolidayType.FULL_DAY
     start_time: Optional[str] = None # For partial day
     end_time: Optional[str] = None   # For partial day
 

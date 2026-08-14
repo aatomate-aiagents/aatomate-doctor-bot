@@ -27,7 +27,7 @@ class SlotGeneratorService:
     def _is_holiday_overlap(start_td: timedelta, end_td: timedelta, holidays: List[DoctorHolidayInDB]) -> bool:
         """Check if a generated slot overlaps with any holiday/leave on this date."""
         for holiday in holidays:
-            if holiday.type == HolidayType.FULL_DAY:
+            if holiday.holiday_type == HolidayType.FULL_DAY:
                 return True
             
             if holiday.start_time and holiday.end_time:
@@ -67,7 +67,7 @@ class SlotGeneratorService:
             return [] # No schedule for this day
 
         # 2. Check full day holidays
-        if any(h.type == HolidayType.FULL_DAY for h in holidays):
+        if any(h.holiday_type == HolidayType.FULL_DAY for h in holidays):
             return []
 
         slots = []

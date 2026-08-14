@@ -75,7 +75,7 @@ class ScheduleService:
                     val = row['holiday_type']
                     if val == 'time_off':
                         val = 'partial_day'
-                    row['type'] = val
+                    row['holiday_type'] = val
                 holidays.append(DoctorHolidayInDB(**row))
         return holidays
 
@@ -93,7 +93,7 @@ class ScheduleService:
                     val = row['holiday_type']
                     if val == 'time_off':
                         val = 'partial_day'
-                    row['type'] = val
+                    row['holiday_type'] = val
                 holidays.append(DoctorHolidayInDB(**row))
         return holidays
 
@@ -161,7 +161,7 @@ class ScheduleService:
 
         # 2. Check full day holidays
         from app.services.slot_generator import SlotGeneratorService
-        if any(h.type == HolidayType.FULL_DAY for h in holidays):
+        if any(h.holiday_type == HolidayType.FULL_DAY for h in holidays):
             return []
 
         day_name = ScheduleService.DAY_NAMES[target_date.weekday()]
