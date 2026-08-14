@@ -733,9 +733,6 @@ class DoctorAgent:
         flow_token = f"tk_{encoded_state}"
 
         payload = {
-            "messaging_product": "whatsapp",
-            "recipient_type": "individual",
-            "to": to_number,
             "type": "interactive",
             "interactive": {
                 "type": "flow",
@@ -763,14 +760,7 @@ class DoctorAgent:
             }
         }
         
-        from app.core.config import settings
-        import requests
-        url = f"https://graph.facebook.com/v21.0/{phone_number_id}/messages"
-        try:
-            requests.post(url, headers={"Authorization": f"Bearer {settings.WHATSAPP_TOKEN}", "Content-Type": "application/json"}, json=payload, timeout=10)
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).error(f"Failed to send unavailable flow cta: {e}")
+        self.sender.send_interactive_message(to_number, payload)
 
     def _show_labs(self, from_number: str, session: dict, doctor):
         patient_id = session.get("selected_patient_id")
