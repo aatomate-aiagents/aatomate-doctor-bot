@@ -77,7 +77,6 @@ export default function AdminDoctorsPage() {
           <h1 className="text-3xl font-bold tracking-tight">Doctors</h1>
           <p className="text-muted-foreground mt-1">Manage all doctors in your hospital.</p>
         </div>
-        <AddUserModal fixedRole={Role.DOCTOR} fixedTenantId={userProfile?.tenantId} triggerText="Add Doctor" />
       </div>
 
       {/* WhatsApp Bot Info Banner */}
