@@ -118,6 +118,7 @@ export function AvailabilityTab({ userProfile }: { userProfile: any }) {
         .from("doctors")
         .select("availability_schedule")
         .eq("name", userName)
+        .eq("tenant_id", userProfile?.tenantId)
         .maybeSingle();
 
       if (docData?.availability_schedule) {
@@ -149,13 +150,13 @@ export function AvailabilityTab({ userProfile }: { userProfile: any }) {
 
   const toggleDay = (index: number) => {
     const newSchedule = [...schedule];
-    newSchedule[index].active = !newSchedule[index].active;
+    newSchedule[index] = { ...newSchedule[index], active: !newSchedule[index].active };
     setSchedule(newSchedule);
   };
 
   const updateTime = (index: number, field: "startTime" | "endTime", value: string) => {
     const newSchedule = [...schedule];
-    newSchedule[index][field] = value;
+    newSchedule[index] = { ...newSchedule[index], [field]: value };
     setSchedule(newSchedule);
   };
 

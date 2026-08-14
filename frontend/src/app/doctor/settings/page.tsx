@@ -48,6 +48,7 @@ export default function DoctorSettingsPage() {
         .from('doctors')
         .select('*')
         .eq('name', userName)
+        .eq('tenant_id', userProfile?.tenantId)
         .maybeSingle();
         
       if (docData && !error) {
