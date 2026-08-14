@@ -32,6 +32,22 @@ def get_patient(patient_id: str, current_user: CurrentUser = Depends(get_current
 @router.get("/", response_model=List[PatientInDB])
 def get_all_patients(current_user: CurrentUser = Depends(get_current_user)):
     """
-    List all patients for a tenant.
+    List all patients for a tenant. If user is a doctor, restrict to their patients.
     """
+    if current_user.active_role == "doctor":
+        # Find doctor_id for this user
+        from app.db.supabase import db
+        doc_res = db.table("doctors").select("id").eq("user_id", current_user.uid).execute()
+        if doc_res.data:
+            doctor_id = doc_res.data[0]["id"]
+            # Fetch patients mapped to this doctor via appointments
+            res = db.table("patients").select("*, appointments!inner(doctor_id)").eq("tenant_id", current_user.tenant_id).eq("appointments.doctor_id", doctor_id).execute()
+            if res.data:
+                # Remove nested appointments array
+                for row in res.data:
+                    if "appointments" in row:
+                        del row["appointments"]
+                return res.data
+            return []
+            
     return PatientService.get_all_patients(current_user.tenant_id)

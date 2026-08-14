@@ -59,23 +59,29 @@ def _get_today_appointments(tenant_id: str, doctor_id: str):
         logger.error(f"[DoctorAgent] get_today_appointments error: {e}")
         return []
 
-def _search_patients(tenant_id: str, query: str):
-    """Search patients by name (ilike) or mobile number."""
+def _search_patients(tenant_id: str, doctor_id: str, query: str):
+    """Search patients by name (ilike) or mobile number, strictly filtered by doctor."""
     try:
+        # Join with appointments to ensure the patient has an appointment with THIS doctor
         by_name = with_retry(lambda: db.table("patients")
-            .select("id,name,mobile_number,dob,blood_group,gender")
+            .select("id,name,mobile_number,dob,blood_group,gender,appointments!inner(doctor_id)")
             .eq("tenant_id", tenant_id)
+            .eq("appointments.doctor_id", doctor_id)
             .ilike("name", f"%{query}%")
             .limit(10)
             .execute())()
         by_mobile = with_retry(lambda: db.table("patients")
-            .select("id,name,mobile_number,dob,blood_group,gender")
+            .select("id,name,mobile_number,dob,blood_group,gender,appointments!inner(doctor_id)")
             .eq("tenant_id", tenant_id)
+            .eq("appointments.doctor_id", doctor_id)
             .ilike("mobile_number", f"%{query}%")
             .limit(10)
             .execute())()
         seen = {}
         for row in (by_name.data or []) + (by_mobile.data or []):
+            # Remove the nested appointments array so it doesn't break downstream assumptions
+            if "appointments" in row:
+                del row["appointments"]
             seen[row["id"]] = row
         return list(seen.values())[:10]
     except Exception as e:
@@ -569,7 +575,7 @@ class DoctorAgent:
 
         # ── Patient search flow ──
         if flow == "SEARCHING":
-            results = _search_patients(self.tenant_id, text)
+            results = _search_patients(self.tenant_id, doctor.get("id"), text)
             if not results:
                 self.sender.send_interactive_message(from_number,
                     _back_to_menu_payload(f"❌ No patients found for *\"{text}\"*.\nTry a different name or number."))
