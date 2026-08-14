@@ -473,7 +473,7 @@ class DoctorAgent:
                 _back_to_menu_payload("🔍 *Search Patient*\n\nType the patient's *name* or *mobile number* to search:"))
 
         elif reply_id == "MARK_UNAVAILABLE":
-            self._send_unavailable_flow_cta(from_number, self.account.phone_number_id, doctor.id)
+            self._send_unavailable_flow_cta(from_number, doctor.id)
 
         elif reply_id == "ACTION_LABS":
             self._show_labs(from_number, session, doctor)
@@ -721,11 +721,11 @@ class DoctorAgent:
 
     # ── Labs ─────────────────────────────────────────────────────
 
-    def _send_unavailable_flow_cta(self, to_number: str, phone_number_id: str, doctor_id: str):
+    def _send_unavailable_flow_cta(self, to_number: str, doctor_id: str):
         import os, json, base64
         flow_id = os.environ.get("WHATSAPP_UNAVAILABLE_FLOW_ID", "")
         if not flow_id:
-            self.sender.send_message(to_number, "⚠️ Unavailable Flow is not configured.", phone_number_id)
+            self.sender.send_message(to_number, "⚠️ Unavailable Flow is not configured.")
             return
 
         state = {"p": to_number, "did": doctor_id, "f": "unavailable"}
