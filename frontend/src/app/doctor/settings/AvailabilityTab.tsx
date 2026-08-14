@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Clock, CalendarX, Plus, Trash2, Loader2, Save, Globe } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
-import { updateDoctor, getDoctorHolidays, deleteDoctorHoliday, createDoctorHoliday } from "@/lib/api";
+import { updateDoctor, getDoctorHolidays, deleteDoctorHoliday, createDoctorHoliday, getDoctors } from "@/lib/api";
 
 const ALL_TIMEZONES = [
   "Asia/Kolkata",
@@ -118,19 +118,18 @@ export function AvailabilityTab({ userProfile }: { userProfile: any }) {
       const userName = userProfile?.name;
       if (!userName) return;
 
-      const { data: docData } = await supabase
-        .from("doctors")
-        .select("id, availability_schedule")
-        .eq("name", userName)
-        .eq("tenant_id", userProfile?.tenantId)
-        .maybeSingle();
+      const doctorsList = await getDoctors();
+      const docData = doctorsList.find(
+        (d) => d.name.trim().toLowerCase() === userName.trim().toLowerCase()
+      );
 
-      if (docData?.availability_schedule) {
+      if (docData) {
         setDoctorId(docData.id);
-        const avail = docData.availability_schedule;
-        // Parse timezone and slot duration from the schedule if stored
-        if (avail._timezone) setTimezone(avail._timezone);
-        if (avail._slot_duration) setSlotDuration(String(avail._slot_duration));
+        const avail = docData.availability_schedule as any;
+        if (avail) {
+          if (avail._timezone) setTimezone(avail._timezone);
+          if (avail._slot_duration) setSlotDuration(String(avail._slot_duration));
+        }
 
         // Load holidays from REST API
         try {
@@ -208,20 +207,29 @@ export function AvailabilityTab({ userProfile }: { userProfile: any }) {
           availabilitySchedule[day.key] = [`${day.startTime}-${day.endTime}`];
         }
         // Inactive days won't have entries → fallback logic in flow_handler sees []
+      let currentDoctorId = doctorId;
+      if (!currentDoctorId) {
+        const doctorsList = await getDoctors();
+        const docData = doctorsList.find(
+          (d) => d.name.trim().toLowerCase() === (userProfile?.name || "").trim().toLowerCase()
+        );
+        if (docData) {
+          currentDoctorId = docData.id;
+          setDoctorId(docData.id);
+        }
       }
 
-      const userName = userProfile?.name;
-      if (!doctorId) throw new Error("Doctor ID not found");
+      if (!currentDoctorId) throw new Error("Doctor ID not found. Please ensure your profile name matches exactly.");
       
       // Update doctor availability schedule using backend API (bypasses RLS)
       await updateDoctor(
-        doctorId,
+        currentDoctorId,
         { availability_schedule: availabilitySchedule },
         userProfile?.tenantId
       );
 
       // Sync overrides to doctor_holidays using backend API
-      const existing = await getDoctorHolidays(doctorId);
+      const existing = await getDoctorHolidays(currentDoctorId);
       
       // Identify which ones to delete
       const currentIds = overrides.map((o) => o.id);

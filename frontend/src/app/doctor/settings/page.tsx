@@ -72,11 +72,23 @@ export default function DoctorSettingsPage() {
         
       if (userError) throw userError;
 
-      if (!doctorId) throw new Error("Doctor ID not found");
+      let currentDoctorId = doctorId;
+      if (!currentDoctorId) {
+        const doctorsList = await getDoctors();
+        const docData = doctorsList.find(
+          (d) => d.name.trim().toLowerCase() === (userProfile?.name || "").trim().toLowerCase()
+        );
+        if (docData) {
+          currentDoctorId = docData.id;
+          setDoctorId(docData.id);
+        }
+      }
+
+      if (!currentDoctorId) throw new Error("Doctor ID not found. Please ensure your profile name matches exactly.");
 
       // Update doctors table using REST API (bypasses RLS)
       await updateDoctor(
-        doctorId,
+        currentDoctorId,
         {
           name,
           specialization: specialty,
