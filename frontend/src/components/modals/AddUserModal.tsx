@@ -54,11 +54,14 @@ export function AddUserModal({ tenants = [], fixedRole, fixedTenantId, triggerTe
     setLoading(true);
     try {
       const metadata: any = { name };
+      if (whatsappNumber) {
+        metadata.whatsapp_number = whatsappNumber;
+      }
+      
       if (isDoctor) {
         metadata.specialization = specialization;
         metadata.experience = experience;
         metadata.fee = fee;
-        metadata.whatsapp_number = whatsappNumber || undefined;
       }
 
       // Import the action dynamically to avoid Next.js client-side errors
@@ -169,9 +172,8 @@ export function AddUserModal({ tenants = [], fixedRole, fixedTenantId, triggerTe
                   <SelectValue placeholder="Select a role" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={Role.HOSPITAL_ADMIN}>Hospital Admin</SelectItem>
-                  <SelectItem value={Role.DOCTOR}>Doctor</SelectItem>
-                  <SelectItem value={Role.STAFF}>Staff</SelectItem>
+                  <SelectItem value={Role.HOSPITAL_ADMIN}>Hospital Administrator</SelectItem>
+                  <SelectItem value={Role.DOCTOR}>Medical Doctor</SelectItem>
                 </SelectContent>
               </Select>
             </div>

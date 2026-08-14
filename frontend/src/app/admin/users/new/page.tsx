@@ -44,11 +44,14 @@ export default function NewUserRegistrationPage() {
     setLoading(true);
     try {
       const metadata: any = { name };
+      if (whatsappNumber) {
+        metadata.whatsapp_number = whatsappNumber;
+      }
+      
       if (isDoctor) {
         metadata.specialization = specialization;
         metadata.experience = experience;
         metadata.fee = fee;
-        metadata.whatsapp_number = whatsappNumber || undefined;
       }
 
       // Import dynamically as before
@@ -190,7 +193,6 @@ export default function NewUserRegistrationPage() {
                     <SelectContent>
                       <SelectItem value={Role.HOSPITAL_ADMIN}>Hospital Administrator</SelectItem>
                       <SelectItem value={Role.DOCTOR}>Medical Doctor</SelectItem>
-                      <SelectItem value={Role.STAFF}>Hospital Staff / Receptionist</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -242,22 +244,22 @@ export default function NewUserRegistrationPage() {
                       className="h-11"
                     />
                   </div>
-                  
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="whatsapp_number" className="text-sm font-medium">
-                      WhatsApp Number <span className="text-[#6B7280] font-normal">(Required for Doctor Bot)</span>
-                    </Label>
-                    <Input 
-                      id="whatsapp_number" 
-                      value={whatsappNumber} 
-                      onChange={(e) => setWhatsappNumber(e.target.value)} 
-                      placeholder="e.g. 919876543210 (country code + number without plus)"
-                      className="h-11"
-                    />
-                  </div>
                 </div>
               </div>
             )}
+            
+            <div className="space-y-2">
+              <Label htmlFor="whatsapp_number" className="text-sm font-medium">
+                WhatsApp Number <span className="text-[#6B7280] font-normal">(Required for Bot Integration)</span>
+              </Label>
+              <Input 
+                id="whatsapp_number" 
+                value={whatsappNumber} 
+                onChange={(e) => setWhatsappNumber(e.target.value)} 
+                placeholder="+91 9876543210" 
+                className="h-11"
+              />
+            </div>
 
             <div className="pt-4 border-t border-[#E5E7EB] flex justify-end gap-3">
               <Button type="button" variant="outline" onClick={() => router.back()} disabled={loading} className="h-11 px-6">

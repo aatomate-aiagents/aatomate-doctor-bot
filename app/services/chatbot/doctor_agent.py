@@ -473,7 +473,7 @@ class DoctorAgent:
                 _back_to_menu_payload("🔍 *Search Patient*\n\nType the patient's *name* or *mobile number* to search:"))
 
         elif reply_id == "MARK_UNAVAILABLE":
-            self._send_unavailable_flow_cta(from_number, self.account.phone_number_id, doctor.get("id"))
+            self._send_unavailable_flow_cta(from_number, self.account.phone_number_id, doctor.id)
 
         elif reply_id == "ACTION_LABS":
             self._show_labs(from_number, session, doctor)
@@ -575,7 +575,7 @@ class DoctorAgent:
 
         # ── Patient search flow ──
         if flow == "SEARCHING":
-            results = _search_patients(self.tenant_id, doctor.get("id"), text)
+            results = _search_patients(self.tenant_id, doctor.id, text)
             if not results:
                 self.sender.send_interactive_message(from_number,
                     _back_to_menu_payload(f"❌ No patients found for *\"{text}\"*.\nTry a different name or number."))
