@@ -99,10 +99,42 @@ def _get_available_slots(doctor_id: str, tenant_id: str, date_str: str) -> List[
             .execute()
         )()
 
-        if not sched_res.data:
-            return []
+        sched = None
+        if sched_res.data:
+            sched = sched_res.data[0]
 
-        sched = sched_res.data[0]
+        # ── Fallback: use doctor.availability_schedule JSON field ──
+        if not sched:
+            DAY_NAMES = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+            day_name = DAY_NAMES[day_of_week]
+            try:
+                doc_res = with_retry(
+                    lambda: db.table("doctors")
+                    .select("availability_schedule")
+                    .eq("id", doctor_id)
+                    .execute()
+                )()
+                doc = doc_res.data[0] if doc_res.data else None
+                avail = doc.get("availability_schedule", {}) if doc else {}
+                ranges = avail.get(day_name, [])
+                if not ranges:
+                    return []
+                # Parse "09:00-17:00" style ranges into a pseudo schedule
+                first_range = ranges[0]
+                start_str, end_str = first_range.split("-")
+                sched = {
+                    "start_time": start_str.strip(),
+                    "end_time": end_str.strip(),
+                    "slot_duration_minutes": 30,
+                    "break_start": None,
+                    "break_end": None,
+                }
+            except Exception as e:
+                logger.error(f"[flow_handler] availability_schedule fallback error: {e}")
+                return []
+
+        if not sched:
+            return []
 
         # Get already-booked slots
         booked_res = with_retry(
